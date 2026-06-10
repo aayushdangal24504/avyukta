@@ -73,8 +73,9 @@ export function ProductCard({ product }: { product: Product }) {
       {quick && (
         <div className="fixed inset-0 z-[120] grid place-items-center bg-[#41323a]/50 p-4 backdrop-blur-sm" onClick={() => setQuick(false)}>
           <div className="anim-pop grid w-full max-w-3xl gap-0 overflow-hidden rounded-3xl bg-white shadow-2xl md:grid-cols-2" onClick={(e) => e.stopPropagation()}>
-            <div className="zoom-box h-64 md:h-auto">
-              <img src={product.images[0]} alt={product.name} className="h-full w-full object-cover" />
+            {/* full image, never cropped: object-contain on a soft backdrop */}
+            <div className="grid h-72 place-items-center bg-[#fdf3ee] md:h-auto md:min-h-[420px]">
+              <img src={product.images[0]} alt={product.name} className="max-h-72 w-full object-contain md:max-h-[480px]" />
             </div>
             <div className="flex flex-col p-7">
               <button onClick={() => setQuick(false)} className="ml-auto grid h-8 w-8 place-items-center rounded-full bg-rose-50 text-sm transition hover:rotate-90">✕</button>

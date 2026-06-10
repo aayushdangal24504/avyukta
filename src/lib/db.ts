@@ -1,3 +1,5 @@
+import { schedulePush } from './supabase';
+
 /**
  * AVYUKTA — client-side database layer.
  * Mirrors the SQL schema: users, categories, products, orders, order_items, settings.
@@ -53,7 +55,7 @@ export interface Order {
   user_id: number | null;
 }
 
-interface DBShape {
+export interface DBShape {
   users: User[];
   categories: Category[];
   products: Product[];
@@ -186,7 +188,16 @@ export function saveDB() {
       // storage quota exceeded (large images) — keep in-memory copy alive
       console.warn('AVYUKTA: storage quota exceeded; data kept in memory only.');
     }
+    schedulePush(cache); // mirror changes to Supabase (no-op until a key is configured)
   }
+  window.dispatchEvent(new CustomEvent('avyukta-db-change'));
+}
+
+/** Replace the whole in-memory db (used when hydrating from Supabase).
+ *  Persists locally and re-renders, but does NOT push back to the cloud. */
+export function replaceCache(shape: DBShape) {
+  cache = shape;
+  try { localStorage.setItem(DB_KEY, JSON.stringify(cache)); } catch { /* quota */ }
   window.dispatchEvent(new CustomEvent('avyukta-db-change'));
 }
 

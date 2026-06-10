@@ -3,7 +3,8 @@
  * Session is persisted (sessionStorage) so admin/customer stay logged in per tab.
  */
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { getDB, saveDB, nextId, hashPassword, checkPassword, sanitize, User, Product } from './db';
+import { getDB, saveDB, replaceCache, nextId, hashPassword, checkPassword, sanitize, User, Product } from './db';
+import { isCloudConfigured, pullFromCloud, pushToCloud } from './supabase';
 
 export interface CartItem {
   product_id: number;
@@ -62,6 +63,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const fn = () => setDbVersion((v) => v + 1);
     window.addEventListener('avyukta-db-change', fn);
     return () => window.removeEventListener('avyukta-db-change', fn);
+  }, []);
+
+  // cloud sync on boot: pull Supabase data if configured (seed the cloud if it's empty)
+  useEffect(() => {
+    if (!isCloudConfigured()) return;
+    (async () => {
+      try {
+        const cloud = await pullFromCloud();
+        if (cloud) replaceCache(cloud);
+        else await pushToCloud(getDB()); // fresh cloud project → seed it with local data
+      } catch (e) {
+        console.warn('AVYUKTA cloud sync failed:', (e as Error).message);
+      }
+    })();
   }, []);
 
   useEffect(() => { localStorage.setItem(CART_KEY, JSON.stringify(cart)); }, [cart]);

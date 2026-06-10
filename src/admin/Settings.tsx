@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { getDB, saveDB, getSetting, hashPassword, checkPassword, sanitize, resetDB, SETTING_DEFAULTS } from '../lib/db';
 import { useStore } from '../lib/store';
 import { Spinner } from '../components/ui';
+import CloudSync from './CloudSync';
 
 /** All editable text keys, grouped for the form. */
 const CONTENT_KEYS = [
@@ -189,6 +190,11 @@ export default function AdminSettings() {
           </button>
         </div>
       </form>
+
+      {/* cloud sync */}
+      <div className="mt-8">
+        <CloudSync />
+      </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         {/* password */}
