@@ -146,11 +146,6 @@ body {
 .admin-dark ::-webkit-scrollbar-track { background: #2a2127; }
 .admin-dark ::-webkit-scrollbar-thumb { background: #5a434d; }
 
-/* image zoom on hover (product detail) */
-.zoom-box { overflow: hidden; }
-.zoom-box img { transition: transform .5s ease; }
-.zoom-box:hover img { transform: scale(1.6); }
-
 /* marquee for testimonials fallback / slow gradient text */
 @keyframes gradShift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
 .text-grad {

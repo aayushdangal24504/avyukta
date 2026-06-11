@@ -26,13 +26,17 @@ create table if not exists products (
   price       numeric not null default 0,
   stock       int not null default 0,
   category_id bigint,
-  images      jsonb not null default '[]',
+  images        jsonb not null default '[]',
+  images_detail jsonb not null default '[]',
   is_featured boolean not null default false,
   is_new      boolean not null default false,
   is_best     boolean not null default false,
   is_visible  boolean not null default true,
   created_at  timestamptz not null default now()
 );
+
+-- safe upgrade for projects that created the table before images_detail existed
+alter table products add column if not exists images_detail jsonb not null default '[]';
 
 create table if not exists orders (
   id            bigint primary key,
@@ -86,3 +90,22 @@ create policy "avyukta open" on products    for all using (true) with check (tru
 create policy "avyukta open" on orders      for all using (true) with check (true);
 create policy "avyukta open" on order_items for all using (true) with check (true);
 create policy "avyukta open" on settings    for all using (true) with check (true);
+
+-- ------------------------------------------------------------
+-- STORAGE: public "products" bucket for product images.
+-- Admin uploads cropped images here; public URLs are saved in
+-- the products.images column.
+-- ------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('products', 'products', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "avyukta products read"   on storage.objects;
+drop policy if exists "avyukta products insert" on storage.objects;
+drop policy if exists "avyukta products update" on storage.objects;
+drop policy if exists "avyukta products delete" on storage.objects;
+
+create policy "avyukta products read"   on storage.objects for select using (bucket_id = 'products');
+create policy "avyukta products insert" on storage.objects for insert with check (bucket_id = 'products');
+create policy "avyukta products update" on storage.objects for update using (bucket_id = 'products');
+create policy "avyukta products delete" on storage.objects for delete using (bucket_id = 'products');

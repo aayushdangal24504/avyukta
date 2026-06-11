@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { getDB, saveDB, nextId, sanitize, getCategoriesSorted, Category } from '../lib/db';
 import { useStore } from '../lib/store';
 import { EmptyState, Spinner } from '../components/ui';
+import { fileToCompressedDataURL } from '../lib/storage';
 
 export default function AdminCategories() {
   const { toast } = useStore();
@@ -22,10 +23,10 @@ export default function AdminCategories() {
     const f = files?.[0];
     if (!f) return;
     if (!f.type.startsWith('image/')) return toast('Only image files are allowed.', 'error');
-    if (f.size > 1.5 * 1024 * 1024) return toast('Image too large (max 1.5 MB).', 'error');
-    const reader = new FileReader();
-    reader.onload = () => setForm((fm) => ({ ...fm, image: reader.result as string }));
-    reader.readAsDataURL(f);
+    // any size accepted — large images are automatically compressed, never rejected
+    fileToCompressedDataURL(f, 1400)
+      .then((url) => setForm((fm) => ({ ...fm, image: url })))
+      .catch(() => toast('Could not read this image file.', 'error'));
   };
 
   const save = async (e: React.FormEvent) => {

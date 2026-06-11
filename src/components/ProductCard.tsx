@@ -33,8 +33,11 @@ export function ProductCard({ product }: { product: Product }) {
           onClick={() => nav(`/product/${product.id}`)}
           className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-rose-50 transition-shadow duration-300 hover:shadow-2xl hover:shadow-rose-200/60"
         >
-          <div className="relative h-56 overflow-hidden">
-            <img ref={imgRef} src={product.images[0]} alt={product.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+          {/* image frame locked to the SAME ratio as the editor (290:224) on every screen size */}
+          <div className="relative aspect-[290/224] overflow-hidden bg-[#fdf3ee]">
+            {/* blurred copy of the same photo fills the frame edges — no bars, no cropping */}
+            <img src={product.images[0]} alt="" aria-hidden loading="lazy" className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl" />
+            <img ref={imgRef} src={product.images[0]} alt={product.name} loading="lazy" className="relative h-full w-full object-contain transition-transform duration-700 group-hover:scale-105" />
             <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
               {product.is_featured && (
                 <span className="rounded-full bg-gradient-to-r from-[#b56576] to-[#d291bc] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow">★ Featured</span>
@@ -73,9 +76,10 @@ export function ProductCard({ product }: { product: Product }) {
       {quick && (
         <div className="fixed inset-0 z-[120] grid place-items-center bg-[#41323a]/50 p-4 backdrop-blur-sm" onClick={() => setQuick(false)}>
           <div className="anim-pop grid w-full max-w-3xl gap-0 overflow-hidden rounded-3xl bg-white shadow-2xl md:grid-cols-2" onClick={(e) => e.stopPropagation()}>
-            {/* full image, never cropped: object-contain on a soft backdrop */}
-            <div className="grid h-72 place-items-center bg-[#fdf3ee] md:h-auto md:min-h-[420px]">
-              <img src={product.images[0]} alt={product.name} className="max-h-72 w-full object-contain md:max-h-[480px]" />
+            {/* full image, never cropped: same frame ratio as the shop card, blurred fill */}
+            <div className="relative aspect-[290/224] self-center overflow-hidden bg-[#fdf3ee]">
+              <img src={product.images[0]} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl" />
+              <img src={product.images[0]} alt={product.name} className="relative h-full w-full object-contain" />
             </div>
             <div className="flex flex-col p-7">
               <button onClick={() => setQuick(false)} className="ml-auto grid h-8 w-8 place-items-center rounded-full bg-rose-50 text-sm transition hover:rotate-90">✕</button>
@@ -87,6 +91,7 @@ export function ProductCard({ product }: { product: Product }) {
           </div>
         </div>
       )}
+
     </>
   );
 }

@@ -32,6 +32,7 @@ export default function ProductDetail() {
 
   const category = db.categories.find((c) => c.id === product.category_id);
   const related = getVisibleProducts().filter((p) => p.category_id === product.category_id && p.id !== product.id).slice(0, 4);
+  // the item page shows the EXACT same pictures as the shop card — one version everywhere
   const images = product.images.length ? product.images : ['images/p1.jpg'];
 
   const add = () => {
@@ -51,8 +52,10 @@ export default function ProductDetail() {
       <div className="mt-6 grid gap-10 lg:grid-cols-2">
         {/* gallery */}
         <div className="anim-up">
-          <div className="zoom-box rounded-[2rem] shadow-xl shadow-rose-200/50 ring-1 ring-rose-100">
-            <img ref={imgRef} src={images[imgIdx]} alt={product.name} className="h-[420px] w-full object-cover" />
+          {/* The uploaded file already IS the adjusted result (ratio + blur baked in).
+              Display it 1:1 at its natural aspect — no frame to fight, no zoom, no mismatch. */}
+          <div className="overflow-hidden rounded-[2rem] shadow-xl shadow-rose-200/50 ring-1 ring-rose-100">
+            <img ref={imgRef} src={images[imgIdx]} alt={product.name} className="block h-auto w-full" />
           </div>
           {images.length > 1 && (
             <div className="mt-4 flex gap-3">

@@ -37,7 +37,7 @@ export function isCloudConfigured(): boolean {
   return getAnonKey().length > 0;
 }
 
-function getClient(): SupabaseClient | null {
+export function getClient(): SupabaseClient | null {
   const key = getAnonKey();
   if (!key) return null;
   if (!client) client = createClient(SUPABASE_URL, key);
@@ -79,10 +79,11 @@ export async function pullFromCloud(): Promise<DBShape | null> {
 
   const users = (u.data || []) as User[];
   const categories = (c.data || []) as Category[];
-  const products = ((p.data || []) as (Product & { images: unknown })[]).map((row) => ({
+  const products = ((p.data || []) as (Product & { images: unknown; images_detail: unknown })[]).map((row) => ({
     ...row,
     price: Number(row.price),
     images: Array.isArray(row.images) ? (row.images as string[]) : [],
+    images_detail: Array.isArray(row.images_detail) ? (row.images_detail as string[]) : (Array.isArray(row.images) ? (row.images as string[]) : []),
     is_featured: !!row.is_featured,
     is_new: !!row.is_new,
     is_best: !!row.is_best,

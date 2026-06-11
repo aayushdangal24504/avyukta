@@ -1,10 +1,13 @@
-/** Admin products: list, add/edit with multi-image upload + preview, delete confirm, toggles. */
+/** Admin products: list, add/edit with crop-then-upload images (Supabase Storage),
+ *  delete confirm, visibility/featured/new/best toggles. */
 import { useRef, useState } from 'react';
 import { getDB, saveDB, nextId, money, sanitize, Product } from '../lib/db';
 import { useStore } from '../lib/store';
 import { EmptyState, Spinner } from '../components/ui';
+import { ImageCropper } from '../components/ImageCropper';
+import { uploadProductImage } from '../lib/storage';
 
-const emptyForm = { name: '', description: '', price: '', stock: '', category_id: 0, images: [] as string[], is_featured: false, is_new: false, is_best: false, is_visible: true };
+const emptyForm = { name: '', description: '', price: '', stock: '', category_id: 0, images: [] as string[], imagesDetail: [] as string[], is_featured: false, is_new: false, is_best: false, is_visible: true };
 
 export default function AdminProducts() {
   const { toast } = useStore();
@@ -13,6 +16,8 @@ export default function AdminProducts() {
   const [form, setForm] = useState({ ...emptyForm });
   const [confirmDel, setConfirmDel] = useState<Product | null>(null);
   const [busy, setBusy] = useState(false);
+  const [cropQueue, setCropQueue] = useState<File[]>([]); // files waiting in the cropper
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const products = [...db.products].sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -20,20 +25,43 @@ export default function AdminProducts() {
 
   const openNew = () => { setForm({ ...emptyForm, category_id: db.categories[0]?.id || 0 }); setEditing('new'); };
   const openEdit = (p: Product) => {
-    setForm({ name: p.name, description: p.description, price: String(p.price), stock: String(p.stock), category_id: p.category_id, images: [...p.images], is_featured: p.is_featured, is_new: p.is_new, is_best: p.is_best, is_visible: p.is_visible });
+    setForm({ name: p.name, description: p.description, price: String(p.price), stock: String(p.stock), category_id: p.category_id, images: [...p.images], imagesDetail: [...(p.images_detail || p.images)], is_featured: p.is_featured, is_new: p.is_new, is_best: p.is_best, is_visible: p.is_visible });
     setEditing(p);
   };
 
-  /* image upload → base64 previews (the "static/uploads" equivalent) */
+  /* Selecting images does NOT upload immediately — each file opens the
+   * crop/position editor first. On save, the processed JPEG is uploaded to
+   * the Supabase Storage "products" bucket and its public URL stored. */
   const onFiles = (files: FileList | null) => {
     if (!files) return;
-    Array.from(files).slice(0, 5).forEach((f) => {
+    const accepted: File[] = [];
+    Array.from(files).forEach((f) => {
       if (!f.type.startsWith('image/')) return toast('Only image files are allowed.', 'error');
-      if (f.size > 1.5 * 1024 * 1024) return toast(`${f.name} is too large (max 1.5 MB).`, 'error');
-      const reader = new FileReader();
-      reader.onload = () => setForm((fm) => ({ ...fm, images: [...fm.images, reader.result as string] }));
-      reader.readAsDataURL(f);
+      // any size accepted — files over 5 MB are automatically compressed,
+      // and the cropper re-encodes everything anyway, so uploads never fail
+      accepted.push(f);
     });
+    const room = 5 - form.images.length;
+    if (accepted.length > room) toast(`Only ${room} more image${room === 1 ? '' : 's'} allowed (max 5).`, 'error');
+    setCropQueue((q) => [...q, ...accepted.slice(0, Math.max(0, room))]);
+    if (fileRef.current) fileRef.current.value = ''; // allow re-selecting the same file
+  };
+
+  /** Cropper "Save & Upload": ONE adjusted image used everywhere —
+   *  the same URL is stored for the shop card and the product page. */
+  const onCropSave = async (blob: Blob) => {
+    setUploading(true);
+    try {
+      const res = await uploadProductImage(blob);
+      setForm((fm) => ({ ...fm, images: [...fm.images, res.url], imagesDetail: [...fm.imagesDetail, res.url] }));
+      // never an error: image is always saved — locally if the cloud isn't ready yet
+      if (res.cloud) toast('Image uploaded to cloud storage ☁️✓');
+      else toast('Image saved ✓ (kept locally — see Settings → Cloud Sync to enable cloud storage)');
+    } catch (e) {
+      toast(`Upload failed: ${(e as Error).message}`, 'error');
+    }
+    setUploading(false);
+    setCropQueue((q) => q.slice(1)); // next file in queue (if any) opens automatically
   };
 
   const save = async (e: React.FormEvent) => {
@@ -52,11 +80,17 @@ export default function AdminProducts() {
         id: nextId('products'), name: sanitize(form.name), description: sanitize(form.description),
         price, stock, category_id: form.category_id,
         images: form.images.length ? form.images : ['images/p1.jpg'],
+        images_detail: form.imagesDetail.length ? form.imagesDetail : (form.images.length ? form.images : ['images/p1.jpg']),
         is_featured: form.is_featured, is_new: form.is_new, is_best: form.is_best, is_visible: form.is_visible, created_at: new Date().toISOString(),
       });
       toast('Product added 🎉');
     } else if (editing) {
-      Object.assign(editing, { name: sanitize(form.name), description: sanitize(form.description), price, stock, category_id: form.category_id, images: form.images.length ? form.images : editing.images, is_featured: form.is_featured, is_new: form.is_new, is_best: form.is_best, is_visible: form.is_visible });
+      Object.assign(editing, {
+        name: sanitize(form.name), description: sanitize(form.description), price, stock, category_id: form.category_id,
+        images: form.images.length ? form.images : editing.images,
+        images_detail: form.imagesDetail.length ? form.imagesDetail : (form.images.length ? form.images : editing.images_detail),
+        is_featured: form.is_featured, is_new: form.is_new, is_best: form.is_best, is_visible: form.is_visible,
+      });
       toast('Product updated ✓');
     }
     saveDB();
@@ -156,7 +190,7 @@ export default function AdminProducts() {
                 <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="input-soft resize-none" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#7f4c5a]">Price ($) *</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#7f4c5a]">Price (Rs.) *</label>
                 <input type="number" step="0.01" min="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="input-soft" required />
               </div>
               <div>
@@ -184,22 +218,26 @@ export default function AdminProducts() {
                 </label>
               </div>
               <div className="sm:col-span-2">
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#7f4c5a]">Images (up to 5, max 1.5 MB each)</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#7f4c5a]">Images (up to 5 — any size, large files are compressed automatically)</label>
                 <div
                   onClick={() => fileRef.current?.click()}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => { e.preventDefault(); onFiles(e.dataTransfer.files); }}
                   className="cursor-pointer rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50/40 p-5 text-center text-sm text-[#a98993] transition hover:border-[#b56576] hover:bg-rose-50"
                 >
-                  📷 Click or drag & drop images here
+                  {uploading ? (
+                    <span className="inline-flex items-center gap-2 text-[#7f4c5a]"><span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-rose-200 border-t-[#b56576]" /> Uploading to cloud storage…</span>
+                  ) : (
+                    <>✂️ Click or drag & drop images — you'll crop & position each one before upload</>
+                  )}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />
                 {form.images.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-3">
                     {form.images.map((src, i) => (
                       <div key={i} className="anim-pop relative">
-                        <img src={src} alt="" className="h-20 w-20 rounded-xl object-cover ring-1 ring-rose-100" />
-                        <button type="button" onClick={() => setForm({ ...form, images: form.images.filter((_, j) => j !== i) })} className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-red-500 text-xs text-white shadow transition hover:scale-110">✕</button>
+                        <img src={src} alt="" className="h-20 w-24 rounded-xl object-cover ring-1 ring-rose-100" />
+                        <button type="button" onClick={() => setForm({ ...form, images: form.images.filter((_, j) => j !== i), imagesDetail: form.imagesDetail.filter((_, j) => j !== i) })} className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-red-500 text-xs text-white shadow transition hover:scale-110">✕</button>
                       </div>
                     ))}
                   </div>
@@ -208,12 +246,24 @@ export default function AdminProducts() {
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setEditing(null)} className="rounded-full px-6 py-2.5 text-sm font-semibold text-[#a98993] transition hover:bg-rose-50">Cancel</button>
-              <button type="submit" disabled={busy} className="btn-grad rounded-full px-8 py-2.5 text-sm font-semibold disabled:opacity-70">
-                {busy ? <Spinner /> : editing === 'new' ? 'Add Product' : 'Save Changes'}
+              <button type="submit" disabled={busy || uploading} className="btn-grad rounded-full px-8 py-2.5 text-sm font-semibold disabled:opacity-70">
+                {busy ? <Spinner /> : uploading ? 'Waiting for upload…' : editing === 'new' ? 'Add Product' : 'Save Changes'}
               </button>
             </div>
           </form>
         </div>
+      )}
+
+      {/* crop & position editor — opens for each selected file before upload */}
+      {cropQueue.length > 0 && (
+        <ImageCropper
+          file={cropQueue[0]}
+          busy={uploading}
+          onSave={onCropSave}
+          onCancel={() => setCropQueue((q) => q.slice(1))}
+          productName={form.name}
+          productPrice={form.price}
+        />
       )}
 
       {/* delete confirmation */}

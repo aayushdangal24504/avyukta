@@ -44,7 +44,7 @@ export default function Dashboard() {
               <span className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br ${s.grad} text-xl text-white shadow-lg`}>{s.icon}</span>
             </div>
             <p className="mt-4 font-display text-3xl font-bold text-[#41323a]">
-              {s.money ? <Counter value={s.value} prefix="$" decimals={2} /> : <Counter value={s.value} />}
+              {s.money ? <Counter value={s.value} prefix="Rs. " decimals={2} /> : <Counter value={s.value} />}
             </p>
             <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-[#a98993]">{s.label}</p>
           </div>

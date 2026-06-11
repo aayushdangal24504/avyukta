@@ -27,7 +27,8 @@ export interface Product {
   price: number;
   stock: number;
   category_id: number;
-  images: string[];
+  images: string[];        // shop-card crops (grid thumbnails)
+  images_detail: string[]; // product-page crops (large photo inside the item)
   is_featured: boolean;
   is_new: boolean; // shown in the "New Arrivals" section + "New" badge
   is_best: boolean; // shown in the "Best Sellers" section + "Best Seller" badge
@@ -130,12 +131,12 @@ function seed(): DBShape {
       { id: 3, name: 'Gift Hampers', image: 'images/cat3.jpg', sort_order: 2 },
     ],
     products: [
-      { id: 1, name: 'Rose Petal Candle Set', description: 'A trio of hand-poured soy candles infused with rose, vanilla and amber. Each candle is topped with real dried rose petals and burns for 30+ hours. Comes in a beautiful keepsake box — the perfect cozy gift.', price: 34.99, stock: 18, category_id: 1, images: ['images/p1.jpg'], is_featured: true, is_new: false, is_best: true, is_visible: true, created_at: day(20) },
-      { id: 2, name: 'Crochet Tulip Bouquet', description: 'A bouquet of everlasting tulips and roses, hand-crocheted petal by petal with premium soft yarn. Wrapped in kraft paper with a satin ribbon. Flowers that never wilt — love that never fades.', price: 42.5, stock: 9, category_id: 2, images: ['images/p2.jpg'], is_featured: true, is_new: false, is_best: true, is_visible: true, created_at: day(15) },
-      { id: 3, name: 'Pressed Flower Resin Jewelry', description: 'Delicate pendant & earring set with real pressed wildflowers preserved in crystal-clear resin. Every piece is one of a kind, hand-set with hypoallergenic rose-gold findings.', price: 28.0, stock: 14, category_id: 3, images: ['images/p3.jpg'], is_featured: true, is_new: false, is_best: true, is_visible: true, created_at: day(12) },
-      { id: 4, name: 'Blush Luxury Gift Hamper', description: 'Our signature hamper: handmade chocolates, a mini soy candle, dried flowers and a hand-written note card, beautifully arranged in a reusable blush box. Fully customizable on request.', price: 64.99, stock: 6, category_id: 3, images: ['images/p4.jpg'], is_featured: true, is_new: true, is_best: false, is_visible: true, created_at: day(9) },
-      { id: 5, name: 'Botanical Pressed Flower Frame', description: 'Real garden roses and wildflowers, pressed by hand and arranged into a golden frame. A romantic piece of wall art that keeps a moment of spring alive forever.', price: 39.0, stock: 11, category_id: 3, images: ['images/p5.jpg'], is_featured: false, is_new: true, is_best: false, is_visible: true, created_at: day(6) },
-      { id: 6, name: 'Rose & Lavender Soap Bars', description: 'Cold-process artisan soaps with rose petals, lavender buds, shea butter and essential oils. Gentle, nourishing and almost too pretty to use. Set of three, wrapped with twine.', price: 19.5, stock: 3, category_id: 1, images: ['images/p6.jpg'], is_featured: false, is_new: true, is_best: false, is_visible: true, created_at: day(3) },
+      { id: 1, name: 'Rose Petal Candle Set', description: 'A trio of hand-poured soy candles infused with rose, vanilla and amber. Each candle is topped with real dried rose petals and burns for 30+ hours. Comes in a beautiful keepsake box — the perfect cozy gift.', price: 34.99, stock: 18, category_id: 1, images: ['images/p1.jpg'], images_detail: ['images/p1.jpg'], is_featured: true, is_new: false, is_best: true, is_visible: true, created_at: day(20) },
+      { id: 2, name: 'Crochet Tulip Bouquet', description: 'A bouquet of everlasting tulips and roses, hand-crocheted petal by petal with premium soft yarn. Wrapped in kraft paper with a satin ribbon. Flowers that never wilt — love that never fades.', price: 42.5, stock: 9, category_id: 2, images: ['images/p2.jpg'], images_detail: ['images/p2.jpg'], is_featured: true, is_new: false, is_best: true, is_visible: true, created_at: day(15) },
+      { id: 3, name: 'Pressed Flower Resin Jewelry', description: 'Delicate pendant & earring set with real pressed wildflowers preserved in crystal-clear resin. Every piece is one of a kind, hand-set with hypoallergenic rose-gold findings.', price: 28.0, stock: 14, category_id: 3, images: ['images/p3.jpg'], images_detail: ['images/p3.jpg'], is_featured: true, is_new: false, is_best: true, is_visible: true, created_at: day(12) },
+      { id: 4, name: 'Blush Luxury Gift Hamper', description: 'Our signature hamper: handmade chocolates, a mini soy candle, dried flowers and a hand-written note card, beautifully arranged in a reusable blush box. Fully customizable on request.', price: 64.99, stock: 6, category_id: 3, images: ['images/p4.jpg'], images_detail: ['images/p4.jpg'], is_featured: true, is_new: true, is_best: false, is_visible: true, created_at: day(9) },
+      { id: 5, name: 'Botanical Pressed Flower Frame', description: 'Real garden roses and wildflowers, pressed by hand and arranged into a golden frame. A romantic piece of wall art that keeps a moment of spring alive forever.', price: 39.0, stock: 11, category_id: 3, images: ['images/p5.jpg'], images_detail: ['images/p5.jpg'], is_featured: false, is_new: true, is_best: false, is_visible: true, created_at: day(6) },
+      { id: 6, name: 'Rose & Lavender Soap Bars', description: 'Cold-process artisan soaps with rose petals, lavender buds, shea butter and essential oils. Gentle, nourishing and almost too pretty to use. Set of three, wrapped with twine.', price: 19.5, stock: 3, category_id: 1, images: ['images/p6.jpg'], images_detail: ['images/p6.jpg'], is_featured: false, is_new: true, is_best: false, is_visible: true, created_at: day(3) },
     ],
     orders: [
       { id: 1, customer_name: 'Sara Malek', phone: '7785551234', location: '12 Rosewood Lane, Springfield', notes: 'Please gift wrap 💝', total: 77.49, status: 'Delivered', created_at: day(6), user_id: null },
@@ -165,10 +166,11 @@ export function getDB(): DBShape {
     const raw = localStorage.getItem(DB_KEY);
     if (raw) {
       cache = JSON.parse(raw) as DBShape;
-      // migration: older saved data may predate the is_new / is_best flags
+      // migration: older saved data may predate the is_new / is_best / images_detail fields
       cache.products.forEach((p) => {
         if (typeof p.is_new !== 'boolean') p.is_new = false;
         if (typeof p.is_best !== 'boolean') p.is_best = false;
+        if (!Array.isArray(p.images_detail)) p.images_detail = [...p.images];
       });
       return cache;
     }
@@ -215,7 +217,7 @@ export function resetDB() {
 /* -------------------------------- helpers -------------------------------- */
 export const sanitize = (s: string) => s.replace(/[<>]/g, '').trim(); // XSS guard for stored strings
 export const validPhone = (p: string) => /^\d{7,15}$/.test(p.replace(/[\s()+-]/g, ''));
-export const money = (n: number) => '$' + n.toFixed(2);
+export const money = (n: number) => 'Rs. ' + n.toFixed(2);
 
 export function getVisibleProducts(): Product[] {
   return getDB().products.filter((p) => p.is_visible);

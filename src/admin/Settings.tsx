@@ -6,6 +6,7 @@ import { getDB, saveDB, getSetting, hashPassword, checkPassword, sanitize, reset
 import { useStore } from '../lib/store';
 import { Spinner } from '../components/ui';
 import CloudSync from './CloudSync';
+import { fileToCompressedDataURL } from '../lib/storage';
 
 /** All editable text keys, grouped for the form. */
 const CONTENT_KEYS = [
@@ -69,14 +70,14 @@ export default function AdminSettings() {
     const f = files?.[0];
     if (!f) return;
     if (!f.type.startsWith('image/')) return toast('Only image files are allowed.', 'error');
-    if (f.size > 500 * 1024) return toast('Logo too large (max 500 KB).', 'error');
-    const reader = new FileReader();
-    reader.onload = () => {
-      db.settings.logo = reader.result as string;
-      saveDB();
-      toast('Logo updated ✓');
-    };
-    reader.readAsDataURL(f);
+    // any size accepted — automatically downscaled to logo dimensions
+    fileToCompressedDataURL(f, 512)
+      .then((url) => {
+        db.settings.logo = url;
+        saveDB();
+        toast('Logo updated ✓');
+      })
+      .catch(() => toast('Could not read this image file.', 'error'));
   };
 
   /* ------------------------------ form helpers ------------------------------ */
