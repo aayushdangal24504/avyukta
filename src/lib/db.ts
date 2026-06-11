@@ -66,7 +66,7 @@ export interface DBShape {
   seq: Record<string, number>;
 }
 
-const DB_KEY = 'avyukta_db_v1';
+export const DB_KEY = 'avyukta_db_v1';
 
 /* ---------- password hashing (FNV-1a + salt rounds, demo-grade) ---------- */
 export function hashPassword(pw: string): string {
@@ -205,8 +205,24 @@ export function replaceCache(shape: DBShape) {
 
 export function nextId(table: keyof DBShape['seq']): number {
   const db = getDB();
-  db.seq[table] = (db.seq[table] || 0) + 1;
+  // collision-proof: never go below the highest id actually present
+  // (protects against stale counters when data arrived from the cloud or another tab)
+  const rows = (db as unknown as Record<string, { id: number }[]>)[table] || [];
+  const maxExisting = rows.reduce((m, r) => Math.max(m, r.id), 0);
+  db.seq[table] = Math.max(db.seq[table] || 0, maxExisting) + 1;
   return db.seq[table];
+}
+
+/** Re-read the db from localStorage (called when ANOTHER TAB writes changes,
+ *  so this tab never holds stale data that could overwrite newer rows). */
+export function reloadFromStorage() {
+  try {
+    const raw = localStorage.getItem(DB_KEY);
+    if (raw) {
+      cache = JSON.parse(raw) as DBShape;
+      window.dispatchEvent(new CustomEvent('avyukta-db-change'));
+    }
+  } catch { /* keep current cache */ }
 }
 
 export function resetDB() {

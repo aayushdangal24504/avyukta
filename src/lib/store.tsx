@@ -3,8 +3,8 @@
  * Session is persisted (sessionStorage) so admin/customer stay logged in per tab.
  */
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { getDB, saveDB, replaceCache, nextId, hashPassword, checkPassword, sanitize, User, Product } from './db';
-import { isCloudConfigured, pullFromCloud, pushToCloud } from './supabase';
+import { getDB, saveDB, replaceCache, reloadFromStorage, nextId, hashPassword, checkPassword, sanitize, User, Product, DB_KEY } from './db';
+import { isCloudConfigured, pullFromCloud, pushToCloud, setSnapshot, isPushPending } from './supabase';
 
 export interface CartItem {
   product_id: number;
@@ -65,18 +65,57 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('avyukta-db-change', fn);
   }, []);
 
-  // cloud sync on boot: pull Supabase data if configured (seed the cloud if it's empty)
+  // cloud sync on boot: Supabase is the source of truth.
+  // Pull cloud data and remember it as this tab's sync snapshot, so later
+  // auto-pushes only send rows THIS tab changes (never wiping newer cloud rows).
   useEffect(() => {
     if (!isCloudConfigured()) return;
     (async () => {
       try {
         const cloud = await pullFromCloud();
-        if (cloud) replaceCache(cloud);
-        else await pushToCloud(getDB()); // fresh cloud project → seed it with local data
+        if (cloud) {
+          replaceCache(cloud);
+          setSnapshot(cloud);
+        } else {
+          await pushToCloud(getDB()); // fresh cloud project → seed it (sets snapshot itself)
+        }
       } catch (e) {
         console.warn('AVYUKTA cloud sync failed:', (e as Error).message);
       }
     })();
+  }, []);
+
+  // multi-tab safety: when ANOTHER tab writes the db, reload it here immediately
+  // so this tab never holds stale data
+  useEffect(() => {
+    const fn = (e: StorageEvent) => { if (e.key === DB_KEY) reloadFromStorage(); };
+    window.addEventListener('storage', fn);
+    return () => window.removeEventListener('storage', fn);
+  }, []);
+
+  // freshness: re-pull from the cloud when the tab regains focus (throttled,
+  // and skipped while a local push is still pending so nothing gets lost)
+  useEffect(() => {
+    if (!isCloudConfigured()) return;
+    let last = Date.now();
+    const fn = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - last < 30_000 || isPushPending()) return;
+      last = Date.now();
+      try {
+        const cloud = await pullFromCloud();
+        if (cloud) {
+          replaceCache(cloud);
+          setSnapshot(cloud);
+        }
+      } catch { /* offline — keep local */ }
+    };
+    document.addEventListener('visibilitychange', fn);
+    window.addEventListener('focus', fn);
+    return () => {
+      document.removeEventListener('visibilitychange', fn);
+      window.removeEventListener('focus', fn);
+    };
   }, []);
 
   useEffect(() => { localStorage.setItem(CART_KEY, JSON.stringify(cart)); }, [cart]);

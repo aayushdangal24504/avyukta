@@ -2,7 +2,7 @@
  *  Paste the anon public key → test → all data syncs automatically. */
 import { useState } from 'react';
 import { getDB, replaceCache } from '../lib/db';
-import { SUPABASE_URL, getAnonKey, setAnonKey, isCloudConfigured, testConnection, pullFromCloud, pushToCloud, getLastPushError } from '../lib/supabase';
+import { SUPABASE_URL, getAnonKey, setAnonKey, isCloudConfigured, testConnection, pullFromCloud, pushToCloud, setSnapshot, getLastPushError } from '../lib/supabase';
 import { useStore } from '../lib/store';
 import { Spinner } from '../components/ui';
 
@@ -25,9 +25,10 @@ export default function CloudSync() {
       const cloud = await pullFromCloud();
       if (cloud) {
         replaceCache(cloud);
+        setSnapshot(cloud);
         toast('Connected — loaded data from Supabase ☁️');
       } else {
-        await pushToCloud(getDB());
+        await pushToCloud(getDB()); // sets the sync snapshot itself
         toast('Connected — your local data was uploaded to Supabase ☁️');
       }
       setConnected(true);
@@ -44,11 +45,11 @@ export default function CloudSync() {
     setError('');
     try {
       if (direction === 'push') {
-        await pushToCloud(getDB());
+        await pushToCloud(getDB()); // upsert-only: never deletes cloud rows
         toast('Local data pushed to Supabase ✓');
       } else {
         const cloud = await pullFromCloud();
-        if (cloud) { replaceCache(cloud); toast('Latest cloud data loaded ✓'); }
+        if (cloud) { replaceCache(cloud); setSnapshot(cloud); toast('Latest cloud data loaded ✓'); }
         else toast('Cloud database is empty — push your local data first.', 'error');
       }
     } catch (e) {

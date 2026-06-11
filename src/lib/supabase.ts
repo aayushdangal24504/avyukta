@@ -107,51 +107,98 @@ export async function pullFromCloud(): Promise<DBShape | null> {
   };
 }
 
+/* ------------------------- snapshot (per-tab) ----------------------------- */
+/* Each tab remembers the state it last synced with the cloud. Pushes are
+ * computed as a DIFF against this snapshot, so a tab only ever writes rows
+ * IT changed and only deletes rows IT explicitly deleted. A tab with stale
+ * data can therefore NEVER wipe newer products created elsewhere. */
+type TableName = 'users' | 'categories' | 'products' | 'orders' | 'order_items';
+const TABLES: TableName[] = ['users', 'categories', 'products', 'orders', 'order_items'];
+
+let snapshot: DBShape | null = null;
+export function setSnapshot(db: DBShape) {
+  snapshot = JSON.parse(JSON.stringify(db)) as DBShape;
+}
+
 /* --------------------------------- PUSH ---------------------------------- */
-/** Upsert all local rows and prune cloud rows that were deleted locally. */
+/** Upsert ALL local rows. NEVER deletes anything in the cloud — used only for
+ *  seeding an empty cloud project and the manual "Push local → cloud" button. */
 export async function pushToCloud(db: DBShape): Promise<void> {
   const sb = getClient();
   if (!sb) return;
 
-  const sync = async (table: string, rows: { id: number }[]) => {
+  for (const t of TABLES) {
+    const rows = db[t] as { id: number }[];
     if (rows.length > 0) {
-      const { error } = await sb.from(table).upsert(rows as never[]);
-      if (error) throw new Error(`${table}: ${error.message}`);
+      const { error } = await sb.from(t).upsert(rows as never[]);
+      if (error) throw new Error(`${t}: ${error.message}`);
     }
-    // prune deleted rows
-    const ids = rows.map((r) => r.id);
-    const del = ids.length > 0
-      ? sb.from(table).delete().not('id', 'in', `(${ids.join(',')})`)
-      : sb.from(table).delete().neq('id', -1);
-    const { error: delErr } = await del;
-    if (delErr) throw new Error(`${table}: ${delErr.message}`);
-  };
-
-  await sync('users', db.users);
-  await sync('categories', db.categories);
-  await sync('products', db.products);
-  await sync('orders', db.orders);
-  await sync('order_items', db.order_items);
-
-  // settings (key/value rows)
+  }
   const settingRows = Object.entries(db.settings).map(([key, value]) => ({ key, value }));
   if (settingRows.length > 0) {
     const { error } = await sb.from('settings').upsert(settingRows);
     if (error) throw new Error(`settings: ${error.message}`);
   }
+  setSnapshot(db); // future auto-pushes diff against this state
+}
+
+/* ------------------------- row-level diff sync ---------------------------- */
+/** Push ONLY the rows changed since the last sync, and delete ONLY the rows
+ *  explicitly removed locally since the last sync. Cloud stays authoritative
+ *  for everything this tab didn't touch. */
+export async function syncDiffToCloud(db: DBShape): Promise<void> {
+  const sb = getClient();
+  if (!sb) return;
+
+  for (const t of TABLES) {
+    const cur = db[t] as { id: number }[];
+    const prev = (snapshot ? (snapshot[t] as { id: number }[]) : []);
+    const prevMap = new Map(prev.map((r) => [r.id, JSON.stringify(r)]));
+    const curIds = new Set(cur.map((r) => r.id));
+
+    // new or modified rows only
+    const changed = cur.filter((r) => prevMap.get(r.id) !== JSON.stringify(r));
+    // rows this tab explicitly deleted (were in OUR last-synced state, gone now)
+    const deletedIds = prev.filter((r) => !curIds.has(r.id)).map((r) => r.id);
+
+    if (changed.length > 0) {
+      const { error } = await sb.from(t).upsert(changed as never[]);
+      if (error) throw new Error(`${t}: ${error.message}`);
+    }
+    if (deletedIds.length > 0) {
+      const { error } = await sb.from(t).delete().in('id', deletedIds);
+      if (error) throw new Error(`${t}: ${error.message}`);
+    }
+  }
+
+  // settings: only keys whose value actually changed
+  const prevSettings = snapshot?.settings ?? {};
+  const settingRows = Object.entries(db.settings)
+    .filter(([k, v]) => prevSettings[k] !== v)
+    .map(([key, value]) => ({ key, value }));
+  if (settingRows.length > 0) {
+    const { error } = await sb.from('settings').upsert(settingRows);
+    if (error) throw new Error(`settings: ${error.message}`);
+  }
+
+  setSnapshot(db);
 }
 
 /* ---------------------------- debounced pusher ---------------------------- */
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let lastPushError = '';
 export function getLastPushError() { return lastPushError; }
+/** True while a debounced push is queued (used to avoid pulling over unsaved changes). */
+export function isPushPending() { return pushTimer !== null; }
 
-/** Called by db.saveDB() after every local write. No-op without a key. */
+/** Called by db.saveDB() after every local write. No-op without a key.
+ *  Uses row-level DIFF sync — never replaces or prunes the whole dataset. */
 export function schedulePush(db: DBShape) {
   if (!isCloudConfigured()) return;
   if (pushTimer) clearTimeout(pushTimer);
   pushTimer = setTimeout(() => {
-    pushToCloud(db)
+    pushTimer = null;
+    syncDiffToCloud(db)
       .then(() => { lastPushError = ''; })
       .catch((e: Error) => {
         lastPushError = e.message;
