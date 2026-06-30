@@ -2,7 +2,7 @@
 import { Link } from 'react-router-dom';
 import { getDB, money } from '../lib/db';
 import { useStore } from '../lib/store';
-import { Counter, StatusBadge } from '../components/ui';
+import { Counter, SafeImage, StatusBadge } from '../components/ui';
 
 export default function Dashboard() {
   useStore();
@@ -78,7 +78,7 @@ export default function Dashboard() {
             <ul className="mt-4 space-y-3">
               {lowStock.map((p) => (
                 <li key={p.id} className="flex items-center gap-3 rounded-2xl bg-amber-50/70 p-3 ring-1 ring-amber-100">
-                  <img src={p.images[0]} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                  <SafeImage src={p.images?.[0]} alt="" className="h-10 w-10 rounded-lg" imgClassName="object-cover" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-[#5d4954]">{p.name}</p>
                     <p className="text-xs font-semibold text-amber-600">{p.stock === 0 ? 'OUT OF STOCK' : `${p.stock} left`}</p>

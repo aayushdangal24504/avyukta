@@ -1,9 +1,9 @@
-/** Product detail: gallery with zoom, qty selector, fly-to-cart, related products. */
+/** Product detail: gallery, qty selector, fly-to-cart, related products. */
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getDB, getVisibleProducts, money } from '../lib/db';
 import { useStore, flyToCart } from '../lib/store';
-import { EmptyState, Reveal } from '../components/ui';
+import { EmptyState, Reveal, SafeImage } from '../components/ui';
 import { ProductCard } from '../components/ProductCard';
 
 export default function ProductDetail() {
@@ -23,7 +23,7 @@ export default function ProductDetail() {
         <EmptyState
           icon="🥀"
           title="Product not found"
-          sub="This piece may have been sold out or removed from our collection."
+          sub="This item may have been removed or is no longer available."
           action={<Link to="/shop" className="btn-grad rounded-full px-6 py-2.5 text-sm font-semibold">Back to shop</Link>}
         />
       </div>
@@ -32,8 +32,7 @@ export default function ProductDetail() {
 
   const category = db.categories.find((c) => c.id === product.category_id);
   const related = getVisibleProducts().filter((p) => p.category_id === product.category_id && p.id !== product.id).slice(0, 4);
-  // the item page shows the EXACT same pictures as the shop card — one version everywhere
-  const images = product.images.length ? product.images : ['images/p1.jpg'];
+  const images = product.images || [];
 
   const add = () => {
     if (product.stock <= 0) return toast('Sorry, this item is out of stock.', 'error');
@@ -52,10 +51,12 @@ export default function ProductDetail() {
       <div className="mt-6 grid gap-10 lg:grid-cols-2">
         {/* gallery */}
         <div className="anim-up">
-          {/* The uploaded file already IS the adjusted result (ratio + blur baked in).
-              Display it 1:1 at its natural aspect — no frame to fight, no zoom, no mismatch. */}
           <div className="overflow-hidden rounded-[2rem] shadow-xl shadow-rose-200/50 ring-1 ring-rose-100">
-            <img ref={imgRef} src={images[imgIdx]} alt={product.name} className="block h-auto w-full" />
+            {images[imgIdx] ? (
+              <img ref={imgRef} src={images[imgIdx]} alt={product.name} className="block h-auto w-full" />
+            ) : (
+              <SafeImage src={null} className="aspect-[290/224] w-full" />
+            )}
           </div>
           {images.length > 1 && (
             <div className="mt-4 flex gap-3">
@@ -65,7 +66,7 @@ export default function ProductDetail() {
                   onClick={() => setImgIdx(i)}
                   className={`h-20 w-20 overflow-hidden rounded-2xl transition-all ${i === imgIdx ? 'ring-2 ring-[#b56576] ring-offset-2' : 'opacity-70 hover:opacity-100'}`}
                 >
-                  <img src={src} alt="" className="h-full w-full object-cover" />
+                  <SafeImage src={src} alt="" className="h-full w-full" imgClassName="object-cover" />
                 </button>
               ))}
             </div>
@@ -82,13 +83,13 @@ export default function ProductDetail() {
             {product.stock > 5 ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> In stock</span>
             ) : product.stock > 0 ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Only {product.stock} left — order soon</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Only {product.stock} left</span>
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 ring-1 ring-red-200"><span className="h-1.5 w-1.5 rounded-full bg-red-500" /> Out of stock</span>
             )}
           </div>
 
-          <p className="mt-6 leading-relaxed text-[#8c737e]">{product.description}</p>
+          {product.description && <p className="mt-6 leading-relaxed text-[#8c737e]">{product.description}</p>}
 
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2 rounded-full bg-white px-2 py-2 shadow-sm ring-1 ring-rose-100">
@@ -109,12 +110,6 @@ export default function ProductDetail() {
           </div>
 
           <button onClick={() => setCartOpen(true)} className="mt-4 text-xs text-[#a98993] underline-offset-2 hover:underline">View cart →</button>
-
-          <div className="mt-8 grid gap-3 rounded-2xl bg-white/70 p-5 text-sm text-[#6b5560] ring-1 ring-rose-100 sm:grid-cols-3">
-            <div>🎀 <span className="font-medium">Gift wrapped</span><br /><span className="text-xs text-[#a98993]">free, always</span></div>
-            <div>🚚 <span className="font-medium">Cash on delivery</span><br /><span className="text-xs text-[#a98993]">pay on arrival</span></div>
-            <div>🤍 <span className="font-medium">Handmade to order</span><br /><span className="text-xs text-[#a98993]">2–4 days craft time</span></div>
-          </div>
         </div>
       </div>
 

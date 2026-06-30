@@ -1,6 +1,9 @@
 /**
  * Global app state: session auth, cart, toast notifications.
- * FIXED: waits for cloud DB before allowing UI to use data
+ *
+ * PRODUCTION-CLEAN: never auto-seeds Supabase, never falls back to demo data.
+ * If the cloud is empty, the local cache simply stays empty and the UI shows
+ * empty states.
  */
 
 import React, {
@@ -28,9 +31,7 @@ import {
 import {
   isCloudConfigured,
   pullFromCloud,
-  pushToCloud,
   setSnapshot,
-  isPushPending
 } from './supabase';
 
 export interface CartItem {
@@ -54,6 +55,7 @@ interface StoreCtx {
   session: Session | null;
   login: (u: string, p: string) => { ok: boolean; error?: string; role?: string };
   register: (u: string, p: string) => { ok: boolean; error?: string };
+  createInitialAdmin: (u: string, p: string) => { ok: boolean; error?: string };
   logout: () => void;
 
   cart: CartItem[];
@@ -81,6 +83,35 @@ export const useStore = () => useContext(Ctx);
 const SESSION_KEY = 'avyukta_session';
 const CART_KEY = 'avyukta_cart';
 
+/* --------------- fly-to-cart helper (used by product cards) --------------- */
+export function flyToCart(srcEl: HTMLElement | null) {
+  if (!srcEl) return;
+  const target = document.getElementById('cart-btn');
+  if (!target) return;
+  const a = srcEl.getBoundingClientRect();
+  const b = target.getBoundingClientRect();
+  const ghost = srcEl.cloneNode(true) as HTMLElement;
+  ghost.style.position = 'fixed';
+  ghost.style.left = a.left + 'px';
+  ghost.style.top = a.top + 'px';
+  ghost.style.width = a.width + 'px';
+  ghost.style.height = a.height + 'px';
+  ghost.style.transition = 'all .8s cubic-bezier(.22,1,.36,1)';
+  ghost.style.zIndex = '300';
+  ghost.style.borderRadius = '50%';
+  ghost.style.pointerEvents = 'none';
+  document.body.appendChild(ghost);
+  requestAnimationFrame(() => {
+    ghost.style.left = b.left + b.width / 2 - 12 + 'px';
+    ghost.style.top = b.top + b.height / 2 - 12 + 'px';
+    ghost.style.width = '24px';
+    ghost.style.height = '24px';
+    ghost.style.opacity = '0.2';
+    ghost.style.transform = 'scale(.2) rotate(180deg)';
+  });
+  setTimeout(() => ghost.remove(), 850);
+}
+
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(() => {
     try {
@@ -101,18 +132,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [cartOpen, setCartOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [dbVersion, setDbVersion] = useState(0);
-
-  // 🔥 NEW: prevents UI from rendering before DB is ready
   const [ready, setReady] = useState(false);
 
   /* ---------------- DB change listener ---------------- */
   useEffect(() => {
-    const fn = () => setDbVersion(v => v + 1);
+    const fn = () => setDbVersion((v) => v + 1);
     window.addEventListener('avyukta-db-change', fn);
     return () => window.removeEventListener('avyukta-db-change', fn);
   }, []);
 
-  /* ---------------- CLOUD INIT (FIXED CORE BUG) ---------------- */
+  /* ---------------- CLOUD INIT (pull-only, never auto-seed) ---------------- */
   useEffect(() => {
     if (!isCloudConfigured()) {
       setReady(true);
@@ -122,17 +151,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const cloud = await pullFromCloud();
-
         if (cloud) {
+          // Whatever Supabase returns IS the truth — even if every table is empty.
           replaceCache(cloud);
           setSnapshot(cloud);
-        } else {
-          await pushToCloud(getDB());
         }
+        // If pullFromCloud() returned null, the client isn't configured;
+        // we DO NOT push anything up. The local empty cache stays empty.
       } catch (e) {
         console.warn('Cloud sync failed:', (e as Error).message);
       } finally {
-        setReady(true); // 🔥 CRITICAL FIX
+        setReady(true);
       }
     })();
   }, []);
@@ -160,62 +189,65 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   /* ---------------- toast ---------------- */
   const toast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     const id = Date.now() + Math.random();
-    setToasts(t => [...t, { id, msg, type }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3200);
+    setToasts((t) => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
   }, []);
 
   /* ---------------- AUTH ---------------- */
   const login = useCallback((username: string, password: string) => {
     const db = getDB();
-
     const user = db.users.find(
-      u => u.username.toLowerCase() === username.trim().toLowerCase()
+      (u) => u.username.toLowerCase() === username.trim().toLowerCase()
     );
-
     if (!user || !checkPassword(password, user.password_hash)) {
       return { ok: false, error: 'Invalid username or password.' };
     }
-
-    setSession({
-      user_id: user.id,
-      username: user.username,
-      role: user.role
-    });
-
+    setSession({ user_id: user.id, username: user.username, role: user.role });
     return { ok: true, role: user.role };
   }, []);
 
   const register = useCallback((username: string, password: string) => {
     const u = sanitize(username);
-
-    if (u.length < 3)
-      return { ok: false, error: 'Username must be at least 3 characters.' };
-
-    if (password.length < 6)
-      return { ok: false, error: 'Password must be at least 6 characters.' };
-
+    if (u.length < 3) return { ok: false, error: 'Username must be at least 3 characters.' };
+    if (password.length < 6) return { ok: false, error: 'Password must be at least 6 characters.' };
     const db = getDB();
-
-    if (db.users.some(x => x.username.toLowerCase() === u.toLowerCase()))
+    if (db.users.some((x) => x.username.toLowerCase() === u.toLowerCase()))
       return { ok: false, error: 'Username is already taken.' };
-
     const user: User = {
       id: nextId('users'),
       username: u,
       password_hash: hashPassword(password),
       role: 'customer',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
-
     db.users.push(user);
-    saveDB(db);
+    saveDB();
+    setSession({ user_id: user.id, username: user.username, role: 'customer' });
+    return { ok: true };
+  }, []);
 
-    setSession({
-      user_id: user.id,
-      username: user.username,
-      role: 'customer'
-    });
-
+  /**
+   * First-run admin bootstrap. Only succeeds if the users table has NO admin
+   * yet. Used by the Admin Login screen to set credentials on first launch.
+   */
+  const createInitialAdmin = useCallback((username: string, password: string) => {
+    const db = getDB();
+    if (db.users.some((u) => u.role === 'admin')) {
+      return { ok: false, error: 'An admin user already exists.' };
+    }
+    const u = sanitize(username);
+    if (u.length < 3) return { ok: false, error: 'Username must be at least 3 characters.' };
+    if (password.length < 6) return { ok: false, error: 'Password must be at least 6 characters.' };
+    const user: User = {
+      id: nextId('users'),
+      username: u,
+      password_hash: hashPassword(password),
+      role: 'admin',
+      created_at: new Date().toISOString(),
+    };
+    db.users.push(user);
+    saveDB();
+    setSession({ user_id: user.id, username: user.username, role: 'admin' });
     return { ok: true };
   }, []);
 
@@ -223,60 +255,49 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   /* ---------------- CART ---------------- */
   const addToCart = useCallback((id: number, qty = 1) => {
-    setCart(c => {
-      const ex = c.find(i => i.product_id === id);
+    setCart((c) => {
+      const ex = c.find((i) => i.product_id === id);
       if (ex)
-        return c.map(i =>
-          i.product_id === id
-            ? { ...i, quantity: i.quantity + qty }
-            : i
-        );
+        return c.map((i) => (i.product_id === id ? { ...i, quantity: i.quantity + qty } : i));
       return [...c, { product_id: id, quantity: qty }];
     });
   }, []);
 
   const setQty = useCallback((id: number, qty: number) => {
-    setCart(c =>
+    setCart((c) =>
       qty <= 0
-        ? c.filter(i => i.product_id !== id)
-        : c.map(i =>
-            i.product_id === id ? { ...i, quantity: qty } : i
-          )
+        ? c.filter((i) => i.product_id !== id)
+        : c.map((i) => (i.product_id === id ? { ...i, quantity: qty } : i))
     );
   }, []);
 
   const removeFromCart = useCallback(
-    (id: number) => setCart(c => c.filter(i => i.product_id !== id)),
+    (id: number) => setCart((c) => c.filter((i) => i.product_id !== id)),
     []
   );
 
   const clearCart = useCallback(() => setCart([]), []);
 
-  /* ---------------- DB derived (SAFE AFTER READY) ---------------- */
+  /* ---------------- derived ---------------- */
   const db = ready ? getDB() : null;
 
   const cartProducts =
     db
       ? cart
-          .map(i => ({
-            product: db.products.find(p => p.id === i.product_id)!,
-            quantity: i.quantity
+          .map((i) => ({
+            product: db.products.find((p) => p.id === i.product_id)!,
+            quantity: i.quantity,
           }))
-          .filter(x => x.product)
+          .filter((x) => x.product)
       : [];
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
+  const cartTotal = cartProducts.reduce((s, i) => s + i.product.price * i.quantity, 0);
 
-  const cartTotal = cartProducts.reduce(
-    (s, i) => s + i.product.price * i.quantity,
-    0
-  );
-
-  /* ---------------- BLOCK UNTIL READY (🔥 KEY FIX) ---------------- */
   if (!ready) {
     return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
-        Loading store...
+      <div style={{ padding: 40, textAlign: 'center', color: '#7f4c5a' }}>
+        Loading…
       </div>
     );
   }
@@ -287,6 +308,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         session,
         login,
         register,
+        createInitialAdmin,
         logout,
         cart,
         addToCart,
@@ -300,7 +322,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setCartOpen,
         toasts,
         toast,
-        dbVersion
+        dbVersion,
       }}
     >
       {children}

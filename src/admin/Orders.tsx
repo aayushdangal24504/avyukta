@@ -15,7 +15,16 @@ export default function AdminOrders() {
 
   const orders = [...db.orders]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .filter((o) => !q.trim() || o.customer_name.toLowerCase().includes(q.toLowerCase()) || o.phone.includes(q.trim()));
+    .filter((o) => {
+      const needle = q.trim().toLowerCase();
+      if (!needle) return true;
+      return (
+        o.customer_name.toLowerCase().includes(needle) ||
+        (o.phone || '').includes(needle) ||
+        (o.email || '').toLowerCase().includes(needle) ||
+        (o.tracking_code || '').toLowerCase().includes(needle)
+      );
+    });
 
   const setStatus = (o: Order, status: OrderStatus) => {
     o.status = status;
@@ -36,12 +45,14 @@ export default function AdminOrders() {
   const exportExcel = () => {
     const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
     const rows = [
-      ['Order ID', 'Date', 'Customer', 'Phone', 'Location', 'Notes', 'Items', 'Total', 'Status'],
+      ['Order ID', 'Tracking Code', 'Date', 'Customer', 'Phone', 'Email', 'Location', 'Notes', 'Items', 'Total', 'Status'],
       ...db.orders.map((o) => [
         o.id,
+        o.tracking_code || '',
         new Date(o.created_at).toLocaleString(),
         o.customer_name,
         o.phone,
+        o.email || '',
         o.location,
         o.notes,
         getOrderItems(o.id).map((i) => `${i.product_name} x${i.quantity}`).join('; '),
@@ -67,7 +78,7 @@ export default function AdminOrders() {
           <p className="mt-1 text-sm text-[#a98993]">{db.orders.length} total · {db.orders.filter((o) => o.status === 'Pending').length} pending</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or phone…" className="input-soft w-56!" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, phone, email, tracking…" className="input-soft w-64!" />
           <button onClick={exportExcel} className="btn-grad rounded-full px-5 py-2.5 text-sm font-semibold">⬇ Export to Excel</button>
         </div>
       </div>
@@ -132,8 +143,12 @@ export default function AdminOrders() {
             <div className="mt-5 grid gap-3 rounded-2xl bg-rose-50/50 p-4 text-sm">
               <p><span className="font-semibold text-[#7f4c5a]">Customer:</span> {view.customer_name}</p>
               <p><span className="font-semibold text-[#7f4c5a]">Phone:</span> {view.phone}</p>
+              {view.email && <p><span className="font-semibold text-[#7f4c5a]">Email:</span> {view.email}</p>}
               <p><span className="font-semibold text-[#7f4c5a]">Address:</span> {view.location}</p>
               {view.notes && <p><span className="font-semibold text-[#7f4c5a]">Notes:</span> {view.notes}</p>}
+              {view.tracking_code && (
+                <p className="break-all"><span className="font-semibold text-[#7f4c5a]">Tracking:</span> <code className="font-mono text-xs">{view.tracking_code}</code></p>
+              )}
             </div>
             <ul className="mt-4 divide-y divide-rose-50">
               {getOrderItems(view.id).map((i) => (

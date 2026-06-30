@@ -1,4 +1,4 @@
-/** Shared UI primitives: Reveal (scroll animation), Petals, Toasts, Skeleton, counters. */
+/** Shared UI primitives: Reveal, Petals, Toasts, Skeleton, counters, NoImage. */
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../lib/store';
 
@@ -176,4 +176,56 @@ export function StatusBadge({ status }: { status: string }) {
 /* spinner for loading buttons */
 export function Spinner() {
   return <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white align-middle" />;
+}
+
+/**
+ * NoImage — neutral placeholder area shown anywhere a product/category image
+ * is missing. NEVER renders a demo image, just a soft empty state with the
+ * label "No image".
+ */
+export function NoImage({ className = '', label }: { className?: string; label?: string }) {
+  const text = label || 'No image';
+  return (
+    <div
+      role="img"
+      aria-label={text}
+      className={`flex items-center justify-center bg-rose-50/60 text-[#bba3ab] ${className}`}
+    >
+      <div className="flex flex-col items-center gap-1.5 text-center">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <circle cx="9" cy="10" r="1.5" />
+          <path d="M21 16l-5-5-7 7" />
+        </svg>
+        <span className="text-[10px] font-semibold uppercase tracking-wider">{text}</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * SafeImage — renders an <img> if `src` is a non-empty string, otherwise
+ * renders <NoImage/>. Drop-in replacement to enforce "no demo image" rule.
+ */
+export function SafeImage({
+  src,
+  alt,
+  className = '',
+  imgClassName = '',
+  fallbackClassName = '',
+  loading,
+  label,
+}: {
+  src?: string | null;
+  alt?: string;
+  className?: string;
+  imgClassName?: string;
+  fallbackClassName?: string;
+  loading?: 'eager' | 'lazy';
+  label?: string;
+}) {
+  if (!src) {
+    return <NoImage className={`${className} ${fallbackClassName}`} label={label} />;
+  }
+  return <img src={src} alt={alt || ''} loading={loading} className={`${className} ${imgClassName}`} />;
 }

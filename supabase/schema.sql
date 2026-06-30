@@ -1,7 +1,10 @@
 -- ============================================================
--- AVYUKTA — Supabase schema
--- Run this ONCE in your Supabase project's SQL Editor:
---   https://supabase.com/dashboard → your project → SQL Editor → New query
+-- Supabase schema — PRODUCTION-CLEAN
+-- Run this ONCE in your Supabase project's SQL Editor.
+--
+-- This script ONLY creates tables and policies. It NEVER inserts
+-- any demo / sample / placeholder data. The application is also
+-- guaranteed to never auto-seed an empty cloud project.
 -- ============================================================
 
 create table if not exists users (
@@ -66,9 +69,9 @@ create table if not exists settings (
 
 -- ------------------------------------------------------------
 -- Row Level Security: open policies so the storefront (anon key)
--- can read/write. NOTE: this is fine for a demo/small shop, but for
--- production you should restrict writes (e.g. only allow inserts on
--- orders/order_items for anon, and manage the rest via service role).
+-- can read/write. For stricter production use, restrict writes
+-- so anon can only INSERT into orders/order_items and only the
+-- service role can mutate products/categories/settings/users.
 -- ------------------------------------------------------------
 alter table users       enable row level security;
 alter table categories  enable row level security;
@@ -77,19 +80,19 @@ alter table orders      enable row level security;
 alter table order_items enable row level security;
 alter table settings    enable row level security;
 
-drop policy if exists "avyukta open" on users;
-drop policy if exists "avyukta open" on categories;
-drop policy if exists "avyukta open" on products;
-drop policy if exists "avyukta open" on orders;
-drop policy if exists "avyukta open" on order_items;
-drop policy if exists "avyukta open" on settings;
+drop policy if exists "open" on users;
+drop policy if exists "open" on categories;
+drop policy if exists "open" on products;
+drop policy if exists "open" on orders;
+drop policy if exists "open" on order_items;
+drop policy if exists "open" on settings;
 
-create policy "avyukta open" on users       for all using (true) with check (true);
-create policy "avyukta open" on categories  for all using (true) with check (true);
-create policy "avyukta open" on products    for all using (true) with check (true);
-create policy "avyukta open" on orders      for all using (true) with check (true);
-create policy "avyukta open" on order_items for all using (true) with check (true);
-create policy "avyukta open" on settings    for all using (true) with check (true);
+create policy "open" on users       for all using (true) with check (true);
+create policy "open" on categories  for all using (true) with check (true);
+create policy "open" on products    for all using (true) with check (true);
+create policy "open" on orders      for all using (true) with check (true);
+create policy "open" on order_items for all using (true) with check (true);
+create policy "open" on settings    for all using (true) with check (true);
 
 -- ------------------------------------------------------------
 -- STORAGE: public "products" bucket for product images.
@@ -100,12 +103,18 @@ insert into storage.buckets (id, name, public)
 values ('products', 'products', true)
 on conflict (id) do update set public = true;
 
-drop policy if exists "avyukta products read"   on storage.objects;
-drop policy if exists "avyukta products insert" on storage.objects;
-drop policy if exists "avyukta products update" on storage.objects;
-drop policy if exists "avyukta products delete" on storage.objects;
+drop policy if exists "products read"   on storage.objects;
+drop policy if exists "products insert" on storage.objects;
+drop policy if exists "products update" on storage.objects;
+drop policy if exists "products delete" on storage.objects;
 
-create policy "avyukta products read"   on storage.objects for select using (bucket_id = 'products');
-create policy "avyukta products insert" on storage.objects for insert with check (bucket_id = 'products');
-create policy "avyukta products update" on storage.objects for update using (bucket_id = 'products');
-create policy "avyukta products delete" on storage.objects for delete using (bucket_id = 'products');
+create policy "products read"   on storage.objects for select using (bucket_id = 'products');
+create policy "products insert" on storage.objects for insert with check (bucket_id = 'products');
+create policy "products update" on storage.objects for update using (bucket_id = 'products');
+create policy "products delete" on storage.objects for delete using (bucket_id = 'products');
+
+-- ============================================================
+-- NOTE: No INSERTs follow. The application never auto-seeds.
+-- The first time you open Admin → Login the app asks you to
+-- create the initial admin user from the UI.
+-- ============================================================

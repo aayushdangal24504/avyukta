@@ -1,19 +1,29 @@
-/** Storefront chrome: navbar with live search & cart badge, slide-in cart drawer, footer. */
+/** Storefront chrome: navbar with live search & cart badge, slide-in cart drawer, footer.
+ *  All copy is pulled from Supabase settings — empty values render nothing. */
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useStore } from '../lib/store';
 import { getSetting, getVisibleProducts, money } from '../lib/db';
+import { SafeImage } from './ui';
+import { RichText } from './RichText';
 
 export function Logo({ light = false }: { light?: boolean }) {
   const logo = getSetting('logo');
+  const name = getSetting('store_name');
   return (
     <Link to="/" className="flex items-center gap-2">
       {logo ? (
         <img src={logo} alt="logo" className="h-9 w-9 rounded-full object-cover ring-2 ring-[#fcd5ce]" />
       ) : (
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-[#b56576] to-[#d291bc] text-lg text-white shadow-md">✿</span>
+        <span className="grid h-9 w-9 place-items-center rounded-full bg-rose-50 text-lg text-[#bba3ab] ring-1 ring-rose-100" aria-label="No logo">
+          ·
+        </span>
       )}
-      <span className={`font-display text-xl font-bold tracking-[0.18em] ${light ? 'text-white' : 'text-[#7f4c5a]'}`}>{getSetting('store_name', 'AVYUKTA')}</span>
+      {name && (
+        <span className={`font-display text-xl font-bold tracking-[0.18em] ${light ? 'text-white' : 'text-[#7f4c5a]'}`}>
+          {name}
+        </span>
+      )}
     </Link>
   );
 }
@@ -49,6 +59,7 @@ export function Navbar() {
     <>
       <NavLink to="/" end className={({ isActive }) => `navlink text-sm font-medium ${isActive ? 'active text-[#b56576]' : 'text-[#6b5560]'}`}>Home</NavLink>
       <NavLink to="/shop" className={({ isActive }) => `navlink text-sm font-medium ${isActive ? 'active text-[#b56576]' : 'text-[#6b5560]'}`}>Shop</NavLink>
+      <NavLink to="/track" className={({ isActive }) => `navlink text-sm font-medium ${isActive ? 'active text-[#b56576]' : 'text-[#6b5560]'}`}>Track Order</NavLink>
       <NavLink to="/account" className={({ isActive }) => `navlink text-sm font-medium ${isActive ? 'active text-[#b56576]' : 'text-[#6b5560]'}`}>
         {session && session.role === 'customer' ? 'My Orders' : 'Account'}
       </NavLink>
@@ -68,7 +79,7 @@ export function Navbar() {
             value={query}
             onChange={(e) => { setQuery(e.target.value); setShowResults(true); }}
             onFocus={() => setShowResults(true)}
-            placeholder="Search handmade gifts…"
+            placeholder="Search…"
             className="input-soft py-2! pl-9"
           />
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-rose-300">⌕</span>
@@ -81,7 +92,7 @@ export function Navbar() {
                   onClick={() => { setShowResults(false); setQuery(''); nav(`/product/${p.id}`); }}
                   className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-[#fff3ef]"
                 >
-                  <img src={p.images[0]} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                  <SafeImage src={p.images?.[0]} alt="" className="h-10 w-10 rounded-lg" imgClassName="object-cover" />
                   <span className="flex-1 text-sm font-medium text-[#5d4954]">{p.name}</span>
                   <span className="text-xs font-semibold text-[#b56576]">{money(p.price)}</span>
                 </button>
@@ -166,7 +177,6 @@ export function CartDrawer() {
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <span className="text-5xl">🌷</span>
               <p className="font-display text-lg font-semibold text-[#7f4c5a]">Your cart is empty</p>
-              <p className="text-sm text-[#a98993]">Lovely handmade things are waiting for you.</p>
               <button onClick={() => { setCartOpen(false); nav('/shop'); }} className="btn-grad mt-2 rounded-full px-6 py-2.5 text-sm font-semibold">
                 Browse the shop
               </button>
@@ -175,7 +185,7 @@ export function CartDrawer() {
             <ul className="space-y-4">
               {cartProducts.map(({ product, quantity }) => (
                 <li key={product.id} className="anim-fade flex gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-rose-50">
-                  <img src={product.images[0]} alt={product.name} className="h-20 w-20 rounded-xl object-cover" />
+                  <SafeImage src={product.images?.[0]} alt={product.name} className="h-20 w-20 rounded-xl" imgClassName="object-cover" />
                   <div className="flex flex-1 flex-col">
                     <p className="text-sm font-semibold text-[#5d4954]">{product.name}</p>
                     <p className="text-xs font-medium text-[#b56576]">{money(product.price)}</p>
@@ -199,7 +209,7 @@ export function CartDrawer() {
               <span className="font-display text-xl font-bold text-[#7f4c5a]">{money(cartTotal)}</span>
             </div>
             <button onClick={() => { setCartOpen(false); nav('/checkout'); }} className="btn-grad w-full rounded-full py-3 text-sm font-semibold tracking-wide">
-              Checkout · Cash on Delivery
+              Checkout
             </button>
           </div>
         )}
@@ -210,35 +220,86 @@ export function CartDrawer() {
 
 /* --------------------------------- Footer -------------------------------- */
 export function Footer() {
+  const name = getSetting('store_name');
+  const tagline = getSetting('tagline');
+  const phone = getSetting('phone');
+  const address = getSetting('address');
+  const email = getSetting('email');
+  const website = getSetting('website');
+  const hours = getSetting('business_hours');
+  const instagram = getSetting('instagram');
+  const facebook = getSetting('facebook');
+  const tiktok = getSetting('tiktok');
+  const whatsapp = getSetting('whatsapp');
+  const paymentText = getSetting('payment_text');
+
+  const socials: [string, string][] = [
+    ['Instagram', instagram],
+    ['Facebook', facebook],
+    ['TikTok', tiktok],
+    ['WhatsApp', whatsapp],
+  ].filter(([, url]) => !!url) as [string, string][];
+
+  const hasContact = phone || address || email || website || hours;
+  const hasBrand = name || tagline;
+
   return (
     <footer className="relative z-10 mt-20 bg-gradient-to-br from-[#7f4c5a] to-[#4f3340] text-rose-100">
       <div className="mx-auto grid max-w-7xl gap-10 px-6 py-14 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <p className="font-display text-2xl font-bold tracking-[0.18em] text-white">✿ {getSetting('store_name', 'AVYUKTA')}</p>
-          <p className="mt-3 text-sm leading-relaxed text-rose-200/80">{getSetting('tagline')}</p>
-        </div>
-        <div>
-          <h4 className="mb-3 text-sm font-semibold uppercase tracking-widest text-[#fcd5ce]">Contact</h4>
-          <p className="text-sm text-rose-200/80">📞 {getSetting('phone')}</p>
-          <p className="mt-2 text-sm text-rose-200/80">📍 {getSetting('address')}</p>
-        </div>
-        <div>
-          <h4 className="mb-3 text-sm font-semibold uppercase tracking-widest text-[#fcd5ce]">Follow us</h4>
-          <div className="flex gap-3">
-            {[['Instagram', getSetting('instagram')], ['Facebook', getSetting('facebook')], ['WhatsApp', getSetting('whatsapp')]].map(([name, url]) => (
-              <a key={name} href={url} target="_blank" rel="noreferrer" className="rounded-full bg-white/10 px-4 py-2 text-xs font-medium transition hover:-translate-y-1 hover:bg-white/20">
-                {name}
-              </a>
-            ))}
+        {hasBrand && (
+          <div>
+            {name && <p className="font-display text-2xl font-bold tracking-[0.18em] text-white">✿ {name}</p>}
+            {tagline && <p className="mt-3 text-sm leading-relaxed text-rose-200/80">{tagline}</p>}
           </div>
-        </div>
-        <div className="rounded-2xl bg-white/10 p-5 ring-1 ring-white/10">
-          <h4 className="mb-2 text-sm font-semibold uppercase tracking-widest text-[#fcd5ce]">💝 Payment</h4>
-          <p className="text-sm leading-relaxed text-rose-200/80">{getSetting('payment_text')}</p>
-        </div>
+        )}
+
+        {hasContact && (
+          <div>
+            <h4 className="mb-3 text-sm font-semibold uppercase tracking-widest text-[#fcd5ce]">Contact</h4>
+            {phone && (
+              <p className="text-sm text-rose-200/80">
+                📞 <a href={`tel:${phone.replace(/\s+/g, '')}`} className="underline-offset-2 hover:underline hover:text-white">{phone}</a>
+              </p>
+            )}
+            {email && (
+              <p className="mt-2 text-sm text-rose-200/80">
+                ✉️ <a href={`mailto:${email}`} className="underline-offset-2 hover:underline hover:text-white">{email}</a>
+              </p>
+            )}
+            {website && (
+              <p className="mt-2 text-sm text-rose-200/80">
+                🌐 <a href={website.startsWith('http') ? website : `https://${website}`} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline hover:text-white">{website}</a>
+              </p>
+            )}
+            {address && <p className="mt-2 text-sm text-rose-200/80">📍 {address}</p>}
+            {hours && <p className="mt-2 whitespace-pre-line text-sm text-rose-200/80">🕒 {hours}</p>}
+          </div>
+        )}
+
+        {socials.length > 0 && (
+          <div>
+            <h4 className="mb-3 text-sm font-semibold uppercase tracking-widest text-[#fcd5ce]">Follow us</h4>
+            <div className="flex flex-wrap gap-3">
+              {socials.map(([n, url]) => (
+                <a key={n} href={url} target="_blank" rel="noreferrer" className="rounded-full bg-white/10 px-4 py-2 text-xs font-medium transition hover:-translate-y-1 hover:bg-white/20">
+                  {n}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {paymentText && (
+          <div className="rounded-2xl bg-white/10 p-5 ring-1 ring-white/10">
+            <h4 className="mb-2 text-sm font-semibold uppercase tracking-widest text-[#fcd5ce]">💝 Payment</h4>
+            <p className="text-sm leading-relaxed text-rose-200/80"><RichText text={paymentText} /></p>
+          </div>
+        )}
       </div>
       <div className="border-t border-white/10 py-4 text-center text-xs text-rose-200/60">
-        © {new Date().getFullYear()} AVYUKTA · Handmade with 🤍 · <Link to="/admin/login" className="underline-offset-2 hover:underline">Admin</Link>
+        © {new Date().getFullYear()}{name ? ` ${name}` : ''} ·{' '}
+        <Link to="/track" className="underline-offset-2 hover:underline hover:text-white">Track order</Link> ·{' '}
+        <Link to="/admin/login" className="underline-offset-2 hover:underline">Admin</Link>
       </div>
     </footer>
   );

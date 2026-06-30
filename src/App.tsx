@@ -9,6 +9,7 @@ import Shop from './pages/Shop';
 import ProductDetail from './pages/ProductDetail';
 import Checkout from './pages/Checkout';
 import Account from './pages/Account';
+import TrackOrder from './pages/TrackOrder';
 import AdminLogin from './admin/AdminLogin';
 import AdminLayout from './admin/AdminLayout';
 import Dashboard from './admin/Dashboard';
@@ -60,6 +61,8 @@ export default function App() {
             <Route path="/product/:id" element={<ProductDetail />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/account" element={<Account />} />
+            <Route path="/track" element={<TrackOrder />} />
+            <Route path="/track/:code" element={<TrackOrder />} />
             <Route path="*" element={<NotFound />} />
           </Route>
 

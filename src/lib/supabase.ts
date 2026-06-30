@@ -1,53 +1,72 @@
 /**
- * AVYUKTA — Supabase cloud sync layer.
+ * AVYUKTA — Supabase cloud sync layer (PRODUCTION-CLEAN).
  *
- * The app always works locally (localStorage). When an anon key is configured
- * (Admin → Settings → Cloud Sync), the database is mirrored to Supabase:
- *   - on app load:   pull cloud data → hydrate local cache
- *   - on every save: debounced push of all tables to the cloud
- *
- * Run `supabase/schema.sql` in the Supabase SQL Editor once to create tables.
+ *   - Supabase URL + anon key MUST be provided by the admin (Settings → Cloud Sync)
+ *     or via Vite env vars (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).
+ *     NOTHING is hard-coded in source.
+ *   - On app load: pull cloud data → hydrate local cache.
+ *   - On every save: debounced diff-push (only rows YOU changed/deleted).
+ *   - We NEVER auto-seed an empty Supabase project.
+ *   - Existing cloud data is never wiped, reset, or replaced by this client.
  */
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { DBShape, Product, Category, User, Order, OrderItem } from './db';
 
-export const SUPABASE_URL = 'https://qmiqwihgremdfehaiccu.supabase.co';
-/** Pre-configured publishable (anon) key — cloud sync works out of the box. */
-const DEFAULT_ANON_KEY = 'sb_publishable_6piUSqwvKICc88rommwFGA_OkJzAqKp';
+const URL_STORAGE = 'avyukta_sb_url';
 const KEY_STORAGE = 'avyukta_sb_anon_key';
-const DISABLED = '__disabled__'; // sentinel: admin explicitly disconnected
+const DISABLED = '__disabled__';
+
+const ENV_URL = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SUPABASE_URL || '';
+const ENV_KEY = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SUPABASE_ANON_KEY || '';
 
 let client: SupabaseClient | null = null;
+
+export function getSupabaseUrl(): string {
+  try {
+    const stored = localStorage.getItem(URL_STORAGE);
+    if (stored === DISABLED) return '';
+    return stored || ENV_URL || '';
+  } catch { return ENV_URL || ''; }
+}
+export function setSupabaseUrl(url: string) {
+  try {
+    if (url.trim()) localStorage.setItem(URL_STORAGE, url.trim());
+    else localStorage.setItem(URL_STORAGE, DISABLED);
+  } catch { /* ignore */ }
+  client = null;
+}
 
 export function getAnonKey(): string {
   try {
     const stored = localStorage.getItem(KEY_STORAGE);
     if (stored === DISABLED) return '';
-    return stored || DEFAULT_ANON_KEY;
-  } catch { return DEFAULT_ANON_KEY; }
+    return stored || ENV_KEY || '';
+  } catch { return ENV_KEY || ''; }
 }
 export function setAnonKey(key: string) {
   try {
     if (key.trim()) localStorage.setItem(KEY_STORAGE, key.trim());
-    else localStorage.setItem(KEY_STORAGE, DISABLED); // explicit disconnect
+    else localStorage.setItem(KEY_STORAGE, DISABLED);
   } catch { /* ignore */ }
-  client = null; // force re-create with the new key
+  client = null;
 }
+
 export function isCloudConfigured(): boolean {
-  return getAnonKey().length > 0;
+  return getSupabaseUrl().length > 0 && getAnonKey().length > 0;
 }
 
 export function getClient(): SupabaseClient | null {
+  const url = getSupabaseUrl();
   const key = getAnonKey();
-  if (!key) return null;
-  if (!client) client = createClient(SUPABASE_URL, key);
+  if (!url || !key) return null;
+  if (!client) client = createClient(url, key);
   return client;
 }
 
 /** Quick connectivity + schema test. Throws a friendly error message on failure. */
 export async function testConnection(): Promise<void> {
   const sb = getClient();
-  if (!sb) throw new Error('No API key configured.');
+  if (!sb) throw new Error('Supabase URL and anon key are required.');
   const { error } = await sb.from('settings').select('key').limit(1);
   if (error) {
     if (/relation .* does not exist|Could not find the table/i.test(error.message)) {
@@ -61,7 +80,11 @@ export async function testConnection(): Promise<void> {
 }
 
 /* --------------------------------- PULL ---------------------------------- */
-/** Fetch everything from Supabase. Returns null if the cloud db is empty. */
+/**
+ * Fetch everything from Supabase. Always returns a DBShape — even when every
+ * table is empty — so the caller can hydrate the local cache and the UI shows
+ * proper empty states. We never auto-seed when this is empty.
+ */
 export async function pullFromCloud(): Promise<DBShape | null> {
   const sb = getClient();
   if (!sb) return null;
@@ -94,9 +117,6 @@ export async function pullFromCloud(): Promise<DBShape | null> {
   const settings: Record<string, string> = {};
   ((s.data || []) as { key: string; value: string }[]).forEach((row) => { settings[row.key] = row.value ?? ''; });
 
-  // empty cloud project → caller should seed it by pushing local data up
-  if (users.length === 0 && categories.length === 0 && products.length === 0) return null;
-
   const maxId = (rows: { id: number }[]) => rows.reduce((m, r) => Math.max(m, r.id), 0);
   return {
     users, categories, products, orders, order_items, settings,
@@ -108,10 +128,6 @@ export async function pullFromCloud(): Promise<DBShape | null> {
 }
 
 /* ------------------------- snapshot (per-tab) ----------------------------- */
-/* Each tab remembers the state it last synced with the cloud. Pushes are
- * computed as a DIFF against this snapshot, so a tab only ever writes rows
- * IT changed and only deletes rows IT explicitly deleted. A tab with stale
- * data can therefore NEVER wipe newer products created elsewhere. */
 type TableName = 'users' | 'categories' | 'products' | 'orders' | 'order_items';
 const TABLES: TableName[] = ['users', 'categories', 'products', 'orders', 'order_items'];
 
@@ -121,8 +137,10 @@ export function setSnapshot(db: DBShape) {
 }
 
 /* --------------------------------- PUSH ---------------------------------- */
-/** Upsert ALL local rows. NEVER deletes anything in the cloud — used only for
- *  seeding an empty cloud project and the manual "Push local → cloud" button. */
+/**
+ * Upsert ALL local rows. NEVER deletes anything in the cloud — used only for
+ * the manual "Push local → cloud" button.
+ */
 export async function pushToCloud(db: DBShape): Promise<void> {
   const sb = getClient();
   if (!sb) return;
@@ -139,13 +157,15 @@ export async function pushToCloud(db: DBShape): Promise<void> {
     const { error } = await sb.from('settings').upsert(settingRows);
     if (error) throw new Error(`settings: ${error.message}`);
   }
-  setSnapshot(db); // future auto-pushes diff against this state
+  setSnapshot(db);
 }
 
 /* ------------------------- row-level diff sync ---------------------------- */
-/** Push ONLY the rows changed since the last sync, and delete ONLY the rows
- *  explicitly removed locally since the last sync. Cloud stays authoritative
- *  for everything this tab didn't touch. */
+/**
+ * Push ONLY the rows changed since the last sync, and delete ONLY the rows
+ * explicitly removed locally since the last sync. Cloud stays authoritative
+ * for everything this tab didn't touch — so a stale tab can never wipe data.
+ */
 export async function syncDiffToCloud(db: DBShape): Promise<void> {
   const sb = getClient();
   if (!sb) return;
@@ -156,9 +176,7 @@ export async function syncDiffToCloud(db: DBShape): Promise<void> {
     const prevMap = new Map(prev.map((r) => [r.id, JSON.stringify(r)]));
     const curIds = new Set(cur.map((r) => r.id));
 
-    // new or modified rows only
     const changed = cur.filter((r) => prevMap.get(r.id) !== JSON.stringify(r));
-    // rows this tab explicitly deleted (were in OUR last-synced state, gone now)
     const deletedIds = prev.filter((r) => !curIds.has(r.id)).map((r) => r.id);
 
     if (changed.length > 0) {
@@ -171,7 +189,6 @@ export async function syncDiffToCloud(db: DBShape): Promise<void> {
     }
   }
 
-  // settings: only keys whose value actually changed
   const prevSettings = snapshot?.settings ?? {};
   const settingRows = Object.entries(db.settings)
     .filter(([k, v]) => prevSettings[k] !== v)
@@ -188,11 +205,8 @@ export async function syncDiffToCloud(db: DBShape): Promise<void> {
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let lastPushError = '';
 export function getLastPushError() { return lastPushError; }
-/** True while a debounced push is queued (used to avoid pulling over unsaved changes). */
 export function isPushPending() { return pushTimer !== null; }
 
-/** Called by db.saveDB() after every local write. No-op without a key.
- *  Uses row-level DIFF sync — never replaces or prunes the whole dataset. */
 export function schedulePush(db: DBShape) {
   if (!isCloudConfigured()) return;
   if (pushTimer) clearTimeout(pushTimer);

@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { getDB, saveDB, nextId, money, sanitize, Product } from '../lib/db';
 import { useStore } from '../lib/store';
-import { EmptyState, Spinner } from '../components/ui';
+import { EmptyState, SafeImage, Spinner } from '../components/ui';
 import { ImageCropper } from '../components/ImageCropper';
 import { uploadProductImage } from '../lib/storage';
 
@@ -79,16 +79,18 @@ export default function AdminProducts() {
       db.products.push({
         id: nextId('products'), name: sanitize(form.name), description: sanitize(form.description),
         price, stock, category_id: form.category_id,
-        images: form.images.length ? form.images : ['images/p1.jpg'],
-        images_detail: form.imagesDetail.length ? form.imagesDetail : (form.images.length ? form.images : ['images/p1.jpg']),
+        // Empty arrays are intentional — UI shows "No image" placeholder, never a demo image.
+        images: form.images,
+        images_detail: form.imagesDetail.length ? form.imagesDetail : form.images,
         is_featured: form.is_featured, is_new: form.is_new, is_best: form.is_best, is_visible: form.is_visible, created_at: new Date().toISOString(),
       });
       toast('Product added 🎉');
     } else if (editing) {
       Object.assign(editing, {
         name: sanitize(form.name), description: sanitize(form.description), price, stock, category_id: form.category_id,
-        images: form.images.length ? form.images : editing.images,
-        images_detail: form.imagesDetail.length ? form.imagesDetail : (form.images.length ? form.images : editing.images_detail),
+        // Respect explicit clears — admin can intentionally remove all images.
+        images: form.images,
+        images_detail: form.imagesDetail.length ? form.imagesDetail : form.images,
         is_featured: form.is_featured, is_new: form.is_new, is_best: form.is_best, is_visible: form.is_visible,
       });
       toast('Product updated ✓');
@@ -136,15 +138,25 @@ export default function AdminProducts() {
             <table className="w-full text-left text-sm">
               <thead className="bg-rose-50/60 text-xs uppercase tracking-wider text-[#a98993]">
                 <tr>
-                  <th className="px-5 py-3">Product</th><th className="px-5 py-3">Category</th><th className="px-5 py-3">Price</th><th className="px-5 py-3">Stock</th><th className="px-5 py-3">Visible</th><th className="px-5 py-3">Featured</th><th className="px-5 py-3">New</th><th className="px-5 py-3">Best</th><th className="px-5 py-3 text-right">Actions</th>
+                  <th className="px-5 py-3">ID</th><th className="px-5 py-3">Product</th><th className="px-5 py-3">Category</th><th className="px-5 py-3">Price</th><th className="px-5 py-3">Stock</th><th className="px-5 py-3">Visible</th><th className="px-5 py-3">Featured</th><th className="px-5 py-3">New</th><th className="px-5 py-3">Best</th><th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {products.map((p) => (
                   <tr key={p.id} className="border-t border-rose-50 transition hover:bg-rose-50/40">
                     <td className="px-5 py-3">
+                      <button
+                        type="button"
+                        title="Click to copy product ID"
+                        onClick={() => { navigator.clipboard?.writeText(String(p.id)); toast(`Copied product ID #${p.id}`); }}
+                        className="font-mono text-xs font-bold text-[#a98993] hover:text-[#b56576]"
+                      >
+                        #{p.id}
+                      </button>
+                    </td>
+                    <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
-                        <img src={p.images[0]} alt="" className="h-11 w-11 rounded-xl object-cover ring-1 ring-rose-100" />
+                        <SafeImage src={p.images?.[0]} alt="" className="h-11 w-11 rounded-xl ring-1 ring-rose-100" imgClassName="object-cover" />
                         <span className="max-w-[200px] truncate font-medium text-[#5d4954]">{p.name}</span>
                       </div>
                     </td>

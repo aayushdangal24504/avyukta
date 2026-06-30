@@ -3,8 +3,12 @@ import { schedulePush } from './supabase';
 /**
  * AVYUKTA — client-side database layer.
  * Mirrors the SQL schema: users, categories, products, orders, order_items, settings.
- * Persisted in localStorage. All reads/writes go through this module
- * (the equivalent of parameterized queries — no raw string interpolation anywhere).
+ *
+ * PRODUCTION-CLEAN BUILD:
+ *   - Supabase is the only source of truth.
+ *   - No demo data, no default settings, no auto-seeding.
+ *   - localStorage is used only as a per-tab cache of cloud state.
+ *   - If no data exists, the app shows empty states everywhere.
  */
 
 export interface User {
@@ -27,11 +31,11 @@ export interface Product {
   price: number;
   stock: number;
   category_id: number;
-  images: string[];        // shop-card crops (grid thumbnails)
-  images_detail: string[]; // product-page crops (large photo inside the item)
+  images: string[];
+  images_detail: string[];
   is_featured: boolean;
-  is_new: boolean; // shown in the "New Arrivals" section + "New" badge
-  is_best: boolean; // shown in the "Best Sellers" section + "Best Seller" badge
+  is_new: boolean;
+  is_best: boolean;
   is_visible: boolean;
   created_at: string;
 }
@@ -48,12 +52,14 @@ export interface Order {
   id: number;
   customer_name: string;
   phone: string;
+  email: string;
   location: string;
   notes: string;
   total: number;
   status: OrderStatus;
   created_at: string;
   user_id: number | null;
+  tracking_code: string;
 }
 
 export interface DBShape {
@@ -67,8 +73,11 @@ export interface DBShape {
 }
 
 export const DB_KEY = 'avyukta_db_v1';
+/** Bumped to invalidate any pre-existing local cache that contained demo data. */
+export const CACHE_VERSION_KEY = 'avyukta_cache_version';
+export const CACHE_VERSION = 'v2-production-clean';
 
-/* ---------- password hashing (FNV-1a + salt rounds, demo-grade) ---------- */
+/* ---------- password hashing (FNV-1a + salt rounds) ---------- */
 export function hashPassword(pw: string): string {
   let h = 0x811c9dc5;
   const salted = 'avyukta::' + pw + '::salt';
@@ -84,59 +93,43 @@ export function checkPassword(pw: string, hash: string): boolean {
   return hashPassword(pw) === hash;
 }
 
-/* --------------------------- default settings ---------------------------- */
-/** Every storefront text the admin can edit lives here. Old saved databases
- *  automatically fall back to these defaults for any missing key. */
-export const SETTING_DEFAULTS: Record<string, string> = {
-  store_name: 'AVYUKTA',
-  tagline: 'Handmade with love, gifted with meaning',
-  hero_title: 'Gifts made by hand,\nstraight from the heart',
-  hero_subtitle: 'Discover one-of-a-kind handmade candles, crochet flowers, resin keepsakes and luxury hampers — crafted slowly, lovingly, just for you.',
-  hero_cta: 'Shop the Collection',
-  hero_cta2: 'Explore Categories',
-  hero_stats: '100% | Handmade\n1.2k+ | Happy gifts\n★ 4.9 | Avg. rating',
-  categories_kicker: 'Curated with love',
-  categories_title: 'Shop by Category',
-  featured_kicker: 'Hand-picked for you',
-  featured_title: 'Featured Treasures',
-  new_title: 'New Arrivals 🌷',
-  best_title: 'Best Sellers 💖',
-  about_kicker: 'Our story',
-  about_title: 'Every piece begins\nwith a feeling 🤍',
-  about_text: 'AVYUKTA was born from a small desk, a glue gun, and an enormous love for making people feel seen. Each candle is poured by hand, every petal crocheted one loop at a time, and all our hampers are arranged like tiny works of art — because gifts should carry meaning, not barcodes.',
-  about_points: 'Hand-crafted in small batches\nPersonalization on every order\nEco-friendly wrapping & materials\nCash on delivery — pay when it arrives',
-  testimonials_kicker: 'Love letters',
-  testimonials_title: 'What our customers say',
-  testimonials: 'Rita K. | The crochet bouquet made my mom cry happy tears. Insanely beautiful packaging too — it felt like unwrapping a treasure.\nNour S. | Ordered the gift hamper for my best friend’s birthday. The attention to detail is unreal. Will absolutely order again!\nJana M. | Candles smell divine and the pressed-flower frame is now the prettiest thing in my living room. Fast, kind service.\nAya T. | You can feel the love in every piece. The resin necklace gets me compliments every single day. Thank you AVYUKTA! 🌸',
-  payment_text: 'Cash on delivery — pay when your gift arrives. We confirm every order personally by phone.',
-  phone: '+1 (555) 010-2030',
-  address: '24 Blossom Street, Artisan Quarter',
-  instagram: 'https://instagram.com/avyukta',
-  facebook: 'https://facebook.com/avyukta',
-  whatsapp: 'https://wa.me/15550102030',
-  logo: '',
-};
-
-/* ------------------------------- seed data ------------------------------- */
-function seed(): DBShape {
-  const now = new Date();
-  const day = (n: number) => new Date(now.getTime() - n * 864e5).toISOString();
-  const db: DBShape = {
-    users: [
-      { id: 1, username: 'admin', password_hash: hashPassword('admin123'), role: 'admin', created_at: day(30) },
-    ],
-    categories: [ ],
+/* ------------------------ empty DB factory ------------------------
+ * Returns a completely empty DB. NO users, NO categories, NO products,
+ * NO orders, NO settings. Used only when no cache exists yet.
+ * NOTHING is ever auto-inserted from this module.
+ * ----------------------------------------------------------------- */
+function emptyDB(): DBShape {
+  return {
+    users: [],
+    categories: [],
     products: [],
     orders: [],
-    order_items: [ ],
-    settings: { ...SETTING_DEFAULTS },
-    seq: { users: 1, categories: 0, products: 0, orders:0, order_items: 0 },
+    order_items: [],
+    settings: {},
+    seq: { users: 0, categories: 0, products: 0, orders: 0, order_items: 0 },
   };
-  return db;
 }
 
 /* ------------------------------ persistence ------------------------------ */
 let cache: DBShape | null = null;
+
+/**
+ * One-time migration: if the browser still holds a pre-cleanup cache
+ * (which contained demo products/categories/settings), wipe it.
+ * Runs once per browser, then never again.
+ */
+function clearLegacyCacheOnce() {
+  try {
+    const v = localStorage.getItem(CACHE_VERSION_KEY);
+    if (v !== CACHE_VERSION) {
+      localStorage.removeItem(DB_KEY);
+      localStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION);
+    }
+  } catch {
+    /* localStorage unavailable — fine, in-memory only */
+  }
+}
+clearLegacyCacheOnce();
 
 export function getDB(): DBShape {
   if (cache) return cache;
@@ -144,37 +137,38 @@ export function getDB(): DBShape {
     const raw = localStorage.getItem(DB_KEY);
     if (raw) {
       cache = JSON.parse(raw) as DBShape;
-      // migration: older saved data may predate the is_new / is_best / images_detail fields
+      // backfill new fields on older rows
       cache.products.forEach((p) => {
         if (typeof p.is_new !== 'boolean') p.is_new = false;
         if (typeof p.is_best !== 'boolean') p.is_best = false;
-        if (!Array.isArray(p.images_detail)) p.images_detail = [...p.images];
+        if (!Array.isArray(p.images_detail)) p.images_detail = Array.isArray(p.images) ? [...p.images] : [];
+        if (!Array.isArray(p.images)) p.images = [];
       });
       return cache;
     }
   } catch {
-    /* corrupted — reseed */
+    /* corrupted — start empty (we never re-seed) */
   }
-  cache = seed();
-  saveDB();
+  cache = emptyDB();
+  // Persist the empty shell so the app has a stable cache slot, but do NOT push
+  // it to Supabase — we never want to overwrite cloud data with an empty shell.
+  try { localStorage.setItem(DB_KEY, JSON.stringify(cache)); } catch { /* quota */ }
   return cache;
 }
 
+/** Save the local cache AND schedule a cloud diff-push. */
 export function saveDB() {
-  if (cache) {
-    try {
-      localStorage.setItem(DB_KEY, JSON.stringify(cache));
-    } catch {
-      // storage quota exceeded (large images) — keep in-memory copy alive
-      console.warn('AVYUKTA: storage quota exceeded; data kept in memory only.');
-    }
-    schedulePush(cache); // mirror changes to Supabase (no-op until a key is configured)
+  if (!cache) return;
+  try {
+    localStorage.setItem(DB_KEY, JSON.stringify(cache));
+  } catch {
+    console.warn('AVYUKTA: storage quota exceeded; data kept in memory only.');
   }
+  schedulePush(cache);
   window.dispatchEvent(new CustomEvent('avyukta-db-change'));
 }
 
-/** Replace the whole in-memory db (used when hydrating from Supabase).
- *  Persists locally and re-renders, but does NOT push back to the cloud. */
+/** Replace the whole in-memory db (used only when hydrating from Supabase). */
 export function replaceCache(shape: DBShape) {
   cache = shape;
   try { localStorage.setItem(DB_KEY, JSON.stringify(cache)); } catch { /* quota */ }
@@ -183,16 +177,13 @@ export function replaceCache(shape: DBShape) {
 
 export function nextId(table: keyof DBShape['seq']): number {
   const db = getDB();
-  // collision-proof: never go below the highest id actually present
-  // (protects against stale counters when data arrived from the cloud or another tab)
   const rows = (db as unknown as Record<string, { id: number }[]>)[table] || [];
   const maxExisting = rows.reduce((m, r) => Math.max(m, r.id), 0);
   db.seq[table] = Math.max(db.seq[table] || 0, maxExisting) + 1;
   return db.seq[table];
 }
 
-/** Re-read the db from localStorage (called when ANOTHER TAB writes changes,
- *  so this tab never holds stale data that could overwrite newer rows). */
+/** Re-read the db from localStorage (called when another tab writes changes). */
 export function reloadFromStorage() {
   try {
     const raw = localStorage.getItem(DB_KEY);
@@ -203,13 +194,8 @@ export function reloadFromStorage() {
   } catch { /* keep current cache */ }
 }
 
-export function resetDB() {
-  cache = seed();
-  saveDB();
-}
-
 /* -------------------------------- helpers -------------------------------- */
-export const sanitize = (s: string) => s.replace(/[<>]/g, '').trim(); // XSS guard for stored strings
+export const sanitize = (s: string) => s.replace(/[<>]/g, '').trim();
 export const validPhone = (p: string) => /^\d{7,15}$/.test(p.replace(/[\s()+-]/g, ''));
 export const money = (n: number) => 'Rs. ' + n.toFixed(2);
 
@@ -222,15 +208,46 @@ export function getCategoriesSorted(): Category[] {
 export function getOrderItems(orderId: number): OrderItem[] {
   return getDB().order_items.filter((i) => i.order_id === orderId);
 }
+
+/**
+ * Read a setting. Returns '' (empty string) if the key is not present in
+ * Supabase / local cache. NEVER returns demo/default content. Callers should
+ * treat an empty return value as "not configured" and render an empty state.
+ */
 export function getSetting(key: string, fallback = ''): string {
-  return getDB().settings[key] ?? SETTING_DEFAULTS[key] ?? fallback;
+  return getDB().settings[key] ?? fallback;
 }
 
-/** Create an order + its items, decrement stock. Returns the new order id. */
+/** Has at least one admin user been created in this Supabase project? */
+export function hasAnyAdmin(): boolean {
+  return getDB().users.some((u) => u.role === 'admin');
+}
+
+/**
+ * Cryptographically-strong tracking code (24-char hex, ~96 bits of entropy).
+ * Falls back to Math.random in the unlikely event Web Crypto is unavailable.
+ */
+export function generateTrackingCode(): string {
+  try {
+    const bytes = new Uint8Array(12);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return Array.from({ length: 24 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+  }
+}
+
+/** Look up an order by its tracking code. */
+export function getOrderByTrackingCode(code: string): Order | null {
+  if (!code) return null;
+  return getDB().orders.find((o) => o.tracking_code === code) || null;
+}
+
+/** Create an order + its items, decrement stock. Returns the new order. */
 export function createOrder(
-  data: { customer_name: string; phone: string; location: string; notes: string; user_id: number | null },
+  data: { customer_name: string; phone: string; email: string; location: string; notes: string; user_id: number | null },
   items: { product_id: number; quantity: number }[]
-): number {
+): Order {
   const db = getDB();
   let total = 0;
   const resolved = items
@@ -243,21 +260,24 @@ export function createOrder(
     .filter(Boolean) as { p: Product; qty: number }[];
 
   const id = nextId('orders');
-  db.orders.push({
+  const order: Order = {
     id,
     customer_name: sanitize(data.customer_name),
     phone: sanitize(data.phone),
+    email: sanitize(data.email),
     location: sanitize(data.location),
     notes: sanitize(data.notes),
     total: Math.round(total * 100) / 100,
     status: 'Pending',
     created_at: new Date().toISOString(),
     user_id: data.user_id,
-  });
+    tracking_code: generateTrackingCode(),
+  };
+  db.orders.push(order);
   resolved.forEach(({ p, qty }) => {
     db.order_items.push({ id: nextId('order_items'), order_id: id, product_id: p.id, product_name: p.name, price: p.price, quantity: qty });
     p.stock = Math.max(0, p.stock - qty);
   });
   saveDB();
-  return id;
+  return order;
 }

@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react';
 import { getDB, saveDB, nextId, sanitize, getCategoriesSorted, Category } from '../lib/db';
 import { useStore } from '../lib/store';
-import { EmptyState, Spinner } from '../components/ui';
+import { EmptyState, SafeImage, Spinner } from '../components/ui';
 import { fileToCompressedDataURL } from '../lib/storage';
 
 export default function AdminCategories() {
@@ -23,23 +23,30 @@ export default function AdminCategories() {
     const f = files?.[0];
     if (!f) return;
     if (!f.type.startsWith('image/')) return toast('Only image files are allowed.', 'error');
-    // any size accepted — large images are automatically compressed, never rejected
     fileToCompressedDataURL(f, 1400)
       .then((url) => setForm((fm) => ({ ...fm, image: url })))
       .catch(() => toast('Could not read this image file.', 'error'));
   };
 
+  const removeImage = () => setForm((fm) => ({ ...fm, image: '' }));
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form.name.trim().length < 2) return toast('Category name is required.', 'error');
     setBusy(true);
-    await new Promise((r) => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, 300));
     if (editing === 'new') {
-      db.categories.push({ id: nextId('categories'), name: sanitize(form.name), image: form.image || 'images/cat1.jpg', sort_order: db.categories.length });
+      db.categories.push({
+        id: nextId('categories'),
+        name: sanitize(form.name),
+        image: form.image, // may be empty — UI will show "No image"
+        sort_order: db.categories.length,
+      });
       toast('Category added 🎉');
     } else if (editing) {
       editing.name = sanitize(form.name);
-      if (form.image) editing.image = form.image;
+      // explicit form.image (incl. empty string) is respected — admin can intentionally clear it
+      editing.image = form.image;
       toast('Category updated ✓');
     }
     saveDB();
@@ -55,7 +62,6 @@ export default function AdminCategories() {
     setConfirmDel(null);
   };
 
-  /* drag & drop reorder */
   const onDrop = (targetId: number) => {
     if (dragId === null || dragId === targetId) return setOverId(null);
     const order = cats.map((c) => c.id).filter((id) => id !== dragId);
@@ -96,14 +102,14 @@ export default function AdminCategories() {
               style={{ animationDelay: `${i * 0.07}s` }}
             >
               <div className="relative h-36">
-                <img src={c.image} alt={c.name} className="h-full w-full object-cover" />
+                <SafeImage src={c.image} alt={c.name} className="h-full w-full" imgClassName="object-cover" />
                 <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-[#7f4c5a] shadow">#{i + 1}</span>
               </div>
               <div className="p-5">
                 <h3 className="font-display text-lg font-bold text-[#41323a]">{c.name}</h3>
                 <p className="text-xs text-[#a98993]">{countFor(c.id)} product{countFor(c.id) !== 1 && 's'}</p>
                 <div className="mt-4 flex gap-2">
-                  <button onClick={() => { setForm({ name: c.name, image: '' }); setEditing(c); }} className="flex-1 rounded-full bg-rose-50 py-2 text-xs font-semibold text-[#7f4c5a] transition hover:bg-rose-100">Edit</button>
+                  <button onClick={() => { setForm({ name: c.name, image: c.image }); setEditing(c); }} className="flex-1 rounded-full bg-rose-50 py-2 text-xs font-semibold text-[#7f4c5a] transition hover:bg-rose-100">Edit</button>
                   <button onClick={() => setConfirmDel(c)} className="flex-1 rounded-full bg-red-50 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-100">Delete</button>
                 </div>
               </div>
@@ -112,7 +118,6 @@ export default function AdminCategories() {
         </div>
       )}
 
-      {/* add/edit modal */}
       {editing && (
         <div className="fixed inset-0 z-[120] grid place-items-center bg-[#241b20]/60 p-4 backdrop-blur-sm" onClick={() => setEditing(null)}>
           <form onSubmit={save} onClick={(e) => e.stopPropagation()} className="anim-pop w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl">
@@ -123,11 +128,14 @@ export default function AdminCategories() {
                 <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-soft" required />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#7f4c5a]">Image {editing !== 'new' && '(leave empty to keep current)'}</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#7f4c5a]">Image (optional)</label>
                 <div onClick={() => fileRef.current?.click()} className="cursor-pointer rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50/40 p-5 text-center text-sm text-[#a98993] transition hover:border-[#b56576]">
-                  {form.image ? <img src={form.image} alt="" className="mx-auto h-24 rounded-xl object-cover" /> : '📷 Click to upload image'}
+                  {form.image ? <img src={form.image} alt="" className="mx-auto h-24 rounded-xl object-cover" /> : '📷 Click to upload image (optional)'}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files)} />
+                {form.image && (
+                  <button type="button" onClick={removeImage} className="mt-2 text-xs text-red-400 hover:text-red-600">Remove image</button>
+                )}
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
@@ -138,7 +146,6 @@ export default function AdminCategories() {
         </div>
       )}
 
-      {/* delete confirm with product warning */}
       {confirmDel && (
         <div className="fixed inset-0 z-[130] grid place-items-center bg-[#241b20]/60 p-4 backdrop-blur-sm" onClick={() => setConfirmDel(null)}>
           <div className="anim-pop w-full max-w-sm rounded-3xl bg-white p-7 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -146,14 +153,14 @@ export default function AdminCategories() {
             <h3 className="mt-4 font-display text-lg font-bold text-[#41323a]">Delete “{confirmDel.name}”?</h3>
             {countFor(confirmDel.id) > 0 ? (
               <p className="mt-2 rounded-xl bg-amber-50 p-3 text-sm font-medium text-amber-700 ring-1 ring-amber-200">
-                This category contains {countFor(confirmDel.id)} product{countFor(confirmDel.id) !== 1 && 's'}! They will become uncategorized.
+                This category contains {countFor(confirmDel.id)} product{countFor(confirmDel.id) !== 1 && 's'}. They will become uncategorized.
               </p>
             ) : (
               <p className="mt-2 text-sm text-[#a98993]">This category is empty — safe to delete.</p>
             )}
             <div className="mt-6 flex justify-center gap-3">
               <button onClick={() => setConfirmDel(null)} className="rounded-full bg-rose-50 px-6 py-2.5 text-sm font-semibold text-[#7f4c5a]">Cancel</button>
-              <button onClick={doDelete} className="rounded-full bg-red-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-200 transition hover:bg-red-600 active:scale-95">Delete anyway</button>
+              <button onClick={doDelete} className="rounded-full bg-red-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-200 transition hover:bg-red-600 active:scale-95">Delete</button>
             </div>
           </div>
         </div>
