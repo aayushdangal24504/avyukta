@@ -16,9 +16,8 @@ const URL_STORAGE = 'avyukta_sb_url';
 const KEY_STORAGE = 'avyukta_sb_anon_key';
 const DISABLED = '__disabled__';
 
-const ENV_URL = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SUPABASE_URL || '';
-const ENV_KEY = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SUPABASE_ANON_KEY || '';
-
+const ENV_URL = 'https://qmiqwihgremdfehaiccu.supabase.co';
+const ENV_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtaXF3aWhncmVtZGZlaGFpY2N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMzE3NDksImV4cCI6MjA5NjYwNzc0OX0.iWGSba3xeQOY5-ZPb1K3sWRd4HU5_HI_hKL-KZiIhM0';
 let client: SupabaseClient | null = null;
 
 export function getSupabaseUrl(): string {
