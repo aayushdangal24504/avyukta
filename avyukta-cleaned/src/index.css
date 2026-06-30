@@ -1,0 +1,158 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap');
+
+@import 'tailwindcss';
+
+:root {
+  --bg: #fffaf0;
+  --accent: #b56576;
+  --accent-dark: #7f4c5a;
+  --accent-2: #fcd5ce;
+  --grad: linear-gradient(135deg, #b56576, #d291bc);
+}
+
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Poppins', sans-serif;
+  background: var(--bg);
+  color: #41323a;
+  overflow-x: hidden;
+}
+.font-display { font-family: 'Playfair Display', serif; }
+
+::selection { background: var(--accent-2); color: var(--accent-dark); }
+::-webkit-scrollbar { width: 9px; }
+::-webkit-scrollbar-track { background: #fdf3e8; }
+::-webkit-scrollbar-thumb { background: #e3b8c2; border-radius: 9px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ---------------------------- gradient button ---------------------------- */
+.btn-grad {
+  position: relative;
+  background: linear-gradient(135deg, #b56576, #d291bc, #b56576);
+  background-size: 200% 200%;
+  color: #fff;
+  overflow: hidden;
+  transition: transform .18s ease, box-shadow .3s ease, background-position .6s ease;
+  box-shadow: 0 6px 18px -6px rgba(181, 101, 118, .55);
+}
+.btn-grad:hover { background-position: 100% 50%; box-shadow: 0 10px 28px -6px rgba(181, 101, 118, .7); transform: translateY(-2px); }
+.btn-grad:active { transform: scale(.96); }
+.btn-grad::after {
+  content: '';
+  position: absolute; top: 0; left: -80%;
+  width: 50%; height: 100%;
+  background: linear-gradient(110deg, transparent, rgba(255,255,255,.45), transparent);
+  transform: skewX(-22deg);
+  transition: left .55s ease;
+}
+.btn-grad:hover::after { left: 130%; }
+
+.btn-ghost {
+  border: 1.5px solid var(--accent);
+  color: var(--accent-dark);
+  transition: all .25s ease;
+}
+.btn-ghost:hover { background: var(--accent); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 20px -8px rgba(181,101,118,.6); }
+.btn-ghost:active { transform: scale(.96); }
+
+/* ------------------------------ input glow ------------------------------- */
+.input-soft {
+  width: 100%;
+  border-radius: .75rem;
+  border: 1px solid rgba(254, 205, 211, .7);
+  background: rgba(255, 255, 255, .85);
+  padding: .65rem 1rem;
+  font-size: .875rem;
+  outline: none;
+  transition: all .3s ease;
+}
+.input-soft::placeholder { color: #fda4af; }
+.input-soft:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(181, 101, 118, .14), 0 4px 14px -6px rgba(181,101,118,.3); }
+
+/* ------------------------------- reveal anim ------------------------------ */
+.reveal { opacity: 0; transform: translateY(34px); transition: opacity .8s cubic-bezier(.22,1,.36,1), transform .8s cubic-bezier(.22,1,.36,1); }
+.reveal.in { opacity: 1; transform: translateY(0); }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: translateY(0); } }
+.anim-up { animation: fadeUp .8s cubic-bezier(.22,1,.36,1) both; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.anim-fade { animation: fadeIn .5s ease both; }
+@keyframes popIn { 0% { opacity: 0; transform: scale(.7); } 70% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+.anim-pop { animation: popIn .55s cubic-bezier(.22,1,.36,1) both; }
+
+/* page transition */
+@keyframes pageIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+.page-enter { animation: pageIn .45s ease both; }
+
+/* ------------------------------- cart bounce ------------------------------ */
+@keyframes cartBounce { 0%,100% { transform: scale(1); } 25% { transform: scale(1.3) rotate(-8deg); } 55% { transform: scale(.92) rotate(5deg); } 80% { transform: scale(1.08); } }
+.cart-bounce { animation: cartBounce .6s ease; }
+
+/* ----------------------------- skeleton shimmer --------------------------- */
+.skeleton {
+  background: linear-gradient(90deg, #f6e7e0 25%, #fdf0ea 50%, #f6e7e0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* -------------------------------- 3D tilt -------------------------------- */
+.tilt-wrap { perspective: 900px; }
+.tilt { transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s ease; transform-style: preserve-3d; will-change: transform; }
+
+/* -------------------------------- petals --------------------------------- */
+.petal {
+  position: fixed;
+  top: -5vh;
+  pointer-events: none;
+  z-index: 5;
+  animation: fall linear infinite, sway ease-in-out infinite alternate;
+  opacity: .8;
+}
+@keyframes fall { to { transform: translateY(112vh) rotate(420deg); } }
+@keyframes sway { from { margin-left: -28px; } to { margin-left: 28px; } }
+
+/* hero blob float */
+@keyframes blobFloat { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(20px,-26px) scale(1.06); } 66% { transform: translate(-18px,16px) scale(.96); } }
+.blob { animation: blobFloat 11s ease-in-out infinite; filter: blur(60px); }
+
+/* hero 3D showcase ring */
+@keyframes spinRing { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+.ring3d { transform-style: preserve-3d; animation: spinRing 26s linear infinite; }
+.ring3d:hover { animation-play-state: paused; }
+
+@keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+.floaty { animation: floaty 5s ease-in-out infinite; }
+
+/* underline link hover */
+.navlink { position: relative; }
+.navlink::after { content: ''; position: absolute; left: 0; bottom: -4px; width: 0; height: 2px; background: var(--grad); border-radius: 2px; transition: width .3s ease; }
+.navlink:hover::after, .navlink.active::after { width: 100%; }
+
+/* toast */
+@keyframes toastIn { from { opacity: 0; transform: translateX(60px) scale(.9); } to { opacity: 1; transform: translateX(0) scale(1); } }
+.toast-in { animation: toastIn .4s cubic-bezier(.22,1,.36,1) both; }
+
+/* success checkmark */
+@keyframes drawCheck { to { stroke-dashoffset: 0; } }
+.check-path { stroke-dasharray: 60; stroke-dashoffset: 60; animation: drawCheck .7s .35s ease forwards; }
+@keyframes ringPulse { 0% { transform: scale(.6); opacity: 0; } 50% { opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+.check-ring { animation: ringPulse .55s cubic-bezier(.22,1,.36,1) both; }
+
+/* drag & drop categories */
+.drag-over { outline: 2px dashed var(--accent); outline-offset: 4px; background: #fdf0ea !important; }
+
+/* admin dark scrollbar zone */
+.admin-dark ::-webkit-scrollbar-track { background: #2a2127; }
+.admin-dark ::-webkit-scrollbar-thumb { background: #5a434d; }
+
+/* marquee for testimonials fallback / slow gradient text */
+@keyframes gradShift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+.text-grad {
+  background: linear-gradient(135deg, #b56576, #d291bc, #b56576);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradShift 6s ease infinite;
+}

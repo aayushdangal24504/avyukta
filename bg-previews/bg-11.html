@@ -1,0 +1,65 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { background: linear-gradient(180deg, #0e1426 0%, #1a1130 100%); position: relative; }
+  
+      .logo, .nav a, h1, .sub, .p-title, .pname { color: #f5e9d4 !important; }
+      .nav a { color: #a89c87 !important; }
+      .cart { background: #ffffff15 !important; color: #fff !important; }
+      .pcard { background: #1f1838 !important; }
+      .pinfo .pname { color: #f5e9d4 !important; }
+      .pprice { color: #f8b4c0 !important; }
+      .star { position:absolute; width:2px; height:2px; background:#fff; border-radius:50%; opacity:.7; animation: twinkle 2s ease-in-out infinite; }
+      @keyframes twinkle { 0%,100%{opacity:.3} 50%{opacity:1} }
+    
+  .nav { position: relative; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 14px 20px; }
+  .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: .15em; color: #f5e9d4; font-size: 14px; }
+  .logo-dot { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg,#b56576,#d291bc); display: grid; place-items: center; color:#fff; font-size: 12px; }
+  .nav a { color: #a89c87; font-size: 11px; text-decoration: none; }
+  .nav .cart { margin-left: auto; width: 30px; height: 30px; border-radius: 50%; background: #1f1838; display: grid; place-items: center; font-size: 12px; }
+  .hero { position: relative; z-index: 10; display: grid; grid-template-columns: 1.1fr .9fr; gap: 16px; padding: 24px 24px 18px; align-items: center; }
+  .kicker { display: inline-block; font-size: 9px; padding: 4px 10px; border-radius: 20px; background: #3a2d5288; color: #b56576; font-weight: 600; letter-spacing: .15em; }
+  h1 { font-size: 22px; font-weight: 700; color: #f5e9d4; line-height: 1.2; margin-top: 8px; }
+  h1 span { background: linear-gradient(135deg,#b56576,#d291bc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .sub { color: #a89c87; font-size: 11px; margin-top: 8px; line-height: 1.5; }
+  .btns { display: flex; gap: 8px; margin-top: 12px; }
+  .btn { font-size: 10px; padding: 8px 14px; border-radius: 20px; border: 0; font-weight: 600; }
+  .btn-p { background: linear-gradient(135deg,#b56576,#d291bc); color: #fff; }
+  .btn-g { background: #1f1838; color: #f5e9d4; border: 1px solid #3a2d52; }
+  .hero-img { aspect-ratio: 1; border-radius: 24px; background: linear-gradient(135deg,#fcd5ce,#e8a2b8); display: grid; place-items: center; box-shadow: 0 12px 30px rgba(180,100,120,.3); color: #fff; font-size: 36px; }
+  .products { position: relative; z-index: 10; padding: 6px 24px 24px; }
+  .p-title { font-size: 13px; font-weight: 700; color: #f5e9d4; margin-bottom: 10px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .pcard { background: #1f1838; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.05); border: 1px solid #3a2d52; }
+  .pimg { aspect-ratio: 1; background: linear-gradient(135deg, var(--c1, #fcd5ce), var(--c2, #d291bc)); }
+  .pinfo { padding: 8px 10px; }
+  .pname { font-size: 10px; color: #f5e9d4; font-weight: 600; }
+  .pprice { font-size: 10px; color: #b56576; font-weight: 700; margin-top: 2px; }
+</style></head>
+<body>
+  <div class="star" style="top:0%; left:0%; animation-delay:-0.0s"></div><div class="star" style="top:7%; left:13%; animation-delay:-0.3s"></div><div class="star" style="top:14%; left:26%; animation-delay:-0.6s"></div><div class="star" style="top:21%; left:39%; animation-delay:-0.8999999999999999s"></div><div class="star" style="top:28%; left:52%; animation-delay:-1.2s"></div><div class="star" style="top:35%; left:65%; animation-delay:-1.5s"></div><div class="star" style="top:42%; left:78%; animation-delay:-1.7999999999999998s"></div><div class="star" style="top:49%; left:91%; animation-delay:-2.1s"></div><div class="star" style="top:56%; left:9%; animation-delay:-2.4s"></div><div class="star" style="top:63%; left:22%; animation-delay:-2.6999999999999997s"></div><div class="star" style="top:70%; left:35%; animation-delay:-3.0s"></div><div class="star" style="top:77%; left:48%; animation-delay:-3.3s"></div><div class="star" style="top:84%; left:61%; animation-delay:-3.5999999999999996s"></div><div class="star" style="top:1%; left:74%; animation-delay:-3.9s"></div><div class="star" style="top:8%; left:87%; animation-delay:-4.2s"></div><div class="star" style="top:15%; left:5%; animation-delay:-4.5s"></div><div class="star" style="top:22%; left:18%; animation-delay:-4.8s"></div><div class="star" style="top:29%; left:31%; animation-delay:-5.1s"></div><div class="star" style="top:36%; left:44%; animation-delay:-5.3999999999999995s"></div><div class="star" style="top:43%; left:57%; animation-delay:-5.7s"></div><div class="star" style="top:50%; left:70%; animation-delay:-6.0s"></div><div class="star" style="top:57%; left:83%; animation-delay:-6.3s"></div><div class="star" style="top:64%; left:1%; animation-delay:-6.6s"></div><div class="star" style="top:71%; left:14%; animation-delay:-6.8999999999999995s"></div><div class="star" style="top:78%; left:27%; animation-delay:-7.199999999999999s"></div><div class="star" style="top:85%; left:40%; animation-delay:-7.5s"></div><div class="star" style="top:2%; left:53%; animation-delay:-7.8s"></div><div class="star" style="top:9%; left:66%; animation-delay:-8.1s"></div><div class="star" style="top:16%; left:79%; animation-delay:-8.4s"></div><div class="star" style="top:23%; left:92%; animation-delay:-8.7s"></div><div class="star" style="top:30%; left:10%; animation-delay:-9.0s"></div><div class="star" style="top:37%; left:23%; animation-delay:-9.299999999999999s"></div><div class="star" style="top:44%; left:36%; animation-delay:-9.6s"></div><div class="star" style="top:51%; left:49%; animation-delay:-9.9s"></div><div class="star" style="top:58%; left:62%; animation-delay:-10.2s"></div><div class="star" style="top:65%; left:75%; animation-delay:-10.5s"></div><div class="star" style="top:72%; left:88%; animation-delay:-10.799999999999999s"></div><div class="star" style="top:79%; left:6%; animation-delay:-11.1s"></div><div class="star" style="top:86%; left:19%; animation-delay:-11.4s"></div><div class="star" style="top:3%; left:32%; animation-delay:-11.7s"></div>
+  <nav class="nav">
+    <div class="logo"><div class="logo-dot">✿</div> AVYUKTA</div>
+    <a href="#">Home</a><a href="#">Shop</a><a href="#">Track</a><a href="#">Account</a>
+    <div class="cart">🛍️</div>
+  </nav>
+  <section class="hero">
+    <div>
+      <span class="kicker">✿ HANDMADE GIFTS</span>
+      <h1>Gifts made by hand,<br><span>straight from the heart</span></h1>
+      <p class="sub">Discover one-of-a-kind handmade candles, crochet flowers, resin keepsakes and luxury hampers.</p>
+      <div class="btns"><button class="btn btn-p">Shop now</button><button class="btn btn-g">Browse</button></div>
+    </div>
+    <div class="hero-img">🌸</div>
+  </section>
+  <section class="products">
+    <div class="p-title">Featured Treasures</div>
+    <div class="grid">
+      <div class="pcard"><div class="pimg" style="--c1:#fcd5ce;--c2:#d291bc"></div><div class="pinfo"><div class="pname">Rose Bouquet</div><div class="pprice">Rs. 1,200</div></div></div>
+      <div class="pcard"><div class="pimg" style="--c1:#fde2d4;--c2:#e8a2b8"></div><div class="pinfo"><div class="pname">Candle Set</div><div class="pprice">Rs. 850</div></div></div>
+      <div class="pcard"><div class="pimg" style="--c1:#f6bdc8;--c2:#b56576"></div><div class="pinfo"><div class="pname">Gift Hamper</div><div class="pprice">Rs. 2,500</div></div></div>
+    </div>
+  </section>
+</body></html>

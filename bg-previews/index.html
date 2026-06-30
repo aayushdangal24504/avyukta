@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Background Previews — Pick Your Style</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #1a1a1a; color: #eee; padding: 24px; }
+  h1 { font-size: 28px; margin-bottom: 8px; text-align: center; }
+  .sub { text-align: center; color: #888; margin-bottom: 32px; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 24px; max-width: 1600px; margin: 0 auto; }
+  .card { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+  .card-label { padding: 14px 18px; background: #232323; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+  .card-label h2 { font-size: 16px; font-weight: 600; }
+  .card-label span { font-size: 11px; color: #999; font-family: monospace; }
+  iframe { width: 100%; height: 480px; border: 0; display: block; background: #fff; }
+  .badge { display: inline-block; font-size: 10px; padding: 3px 8px; border-radius: 10px; background: #444; color: #ccc; margin-left: 8px; }
+  .badge.fast { background: #0a4d2e; color: #6ee7b7; }
+  .badge.med  { background: #4d3a0a; color: #fcd34d; }
+  .badge.slow { background: #4d0a0a; color: #fca5a5; }
+  .pick-hint { text-align: center; color: #aaa; max-width: 700px; margin: 40px auto 0; padding: 20px; background: #2a2a2a; border-radius: 12px; font-size: 14px; line-height: 1.6; }
+  code { background: #444; padding: 2px 6px; border-radius: 4px; color: #fcd34d; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>🎨 Pick a Background</h1>
+  <p class="sub">Each preview is a live mockup of your store. Click any to open larger. Just tell me the number you like.</p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-label"><h2>1. Cream Petals <span class="badge med">current</span></h2><span>#fffaf0</span></div>
+      <iframe src="bg-01.html" loading="lazy"></iframe>
+    </div>
+    <div class="card">
+      <div class="card-label"><h2>2. Blush Pink Gradient <span class="badge fast">fast</span></h2><span>#fff0f3 → #fef7f0</span></div>
+      <iframe src="bg-02.html" loading="lazy"></iframe>
+    </div>
+    <div class="card">
+      <div class="card-label"><h2>3. Pure White <span class="badge fast">fast</span></h2><span>#ffffff</span></div>
+      <iframe src="bg-03.html" loading="lazy"></iframe>
+    </div>
+    <div class="card">
+      <div class="card-label"><h2>4. Off-White Editorial <span class="badge fast">fast</span></h2><span>#fafaf7</span></div>
+      <iframe src="bg-04.html" loading="lazy"></iframe>
+    </div>
+    <div class="card">
+      <div class="card-label"><h2>5. Sage Natural <span class="badge fast">fast</span></h2><span>#f5f5f0 + sage</span></div>
+      <iframe src="bg-05.html" loading="lazy"></iframe>
+    </div>
+    <div class="card">
+      <div class="card-label"><h2>6. Warm Beige <span class="badge fast">fast</span></h2><span>#f4ede4</span></div>
+      <iframe src="bg-06.html" loading="lazy"></iframe>
+    </div>
+    <div class="card">
+      <div class="card-label"><h2>7. Dark Plum Luxury <span class="badge fast">fast</span></h2><span>#2c1f29</span></div>
+      <iframe src="bg-07.html" loading="lazy"></iframe>
+    </div>
+    <div class="card">
+      <div class="card-label"><h2>8. Animated Pastel Gradient <span class="badge med">animated</span></h2><span>mesh gradient</span></div>
+      <iframe src="bg-08.html" loading="lazy"></iframe>
+    </div>
+    <div class="card">
+      <div class="card-label"><h2>9. Mesh Gradient Static <span class="badge fast">fast</span></h2><span>colorful blur</span></div>
+      <iframe src="bg-09.html" loading="lazy"></iframe>
+    </div>
+    <div class="card">
+      <div class="card-label"><h2>10. Linen Texture <span class="badge fast">fast</span></h2><span>#faf6f0 + grain</span></div>
+      <iframe src="bg-10.html" loading="lazy"></iframe>
+    </div>
+    <div class="card">
+      <div class="card-label"><h2>11. Midnight Garden <span class="badge fast">fast</span></h2><span>navy → black</span></div>
+      <iframe src="bg-11.html" loading="lazy"></iframe>
+    </div>
+    <div class="card">
+      <div class="card-label"><h2>12. Sparkles + Cream <span class="badge med">animated</span></h2><span>twinkling dots</span></div>
+      <iframe src="bg-12.html" loading="lazy"></iframe>
+    </div>
+  </div>
+
+  <div class="pick-hint">
+    💡 <b>Just tell me the number(s) you like</b> and I'll apply that background to your real store. <br>
+    <span class="badge fast">fast</span> = no performance cost · <span class="badge med">animated</span> = small cost · <span class="badge slow">slow</span> = noticeable cost<br>
+    You can also mix: e.g. <code>"Use #2 but with sparkles from #12"</code>
+  </div>
+</body>
+</html>
