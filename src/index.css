@@ -146,6 +146,37 @@ body {
 .admin-dark ::-webkit-scrollbar-track { background: #2a2127; }
 .admin-dark ::-webkit-scrollbar-thumb { background: #5a434d; }
 
+/* ------------------------------- smooth scroll ---------------------------- */
+.smooth-scroll { scroll-behavior: smooth; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .smooth-scroll { scroll-behavior: auto; }
+}
+
+/* ----------------- nav menu (hamburger + drawer + flyout) ----------------- */
+@keyframes drawerIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes drawerOut { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+@keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes overlayOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes flyoutIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes flyoutOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-12px); } }
+@keyframes accordionDown { from { max-height: 0; opacity: 0; } to { max-height: 600px; opacity: 1; } }
+@keyframes accordionUp { from { max-height: 600px; opacity: 1; } to { max-height: 0; opacity: 0; } }
+@keyframes stagger { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+
+.menu-drawer-in { animation: drawerIn 280ms cubic-bezier(.22,1,.36,1) both; }
+.menu-drawer-out { animation: drawerOut 240ms cubic-bezier(.55,0,.7,.3) both; }
+.menu-overlay-in { animation: overlayIn 220ms ease both; }
+.menu-overlay-out { animation: overlayOut 200ms ease both; }
+.menu-flyout-in { animation: flyoutIn 220ms cubic-bezier(.22,1,.36,1) both; }
+.menu-accordion-down { animation: accordionDown 280ms cubic-bezier(.22,1,.36,1) both; overflow: hidden; }
+.menu-accordion-up { animation: accordionUp 220ms cubic-bezier(.55,0,.7,.3) both; overflow: hidden; }
+.menu-stagger { animation: stagger 360ms cubic-bezier(.22,1,.36,1) both; }
+
+/* prevent body scroll while drawer is open */
+body.menu-open { overflow: hidden; }
+
 /* marquee for testimonials fallback / slow gradient text */
 @keyframes gradShift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
 .text-grad {

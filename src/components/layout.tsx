@@ -6,6 +6,7 @@ import { useStore } from '../lib/store';
 import { getSetting, getVisibleProducts, money } from '../lib/db';
 import { SafeImage } from './ui';
 import { RichText } from './RichText';
+import { NavMenu } from './NavMenu';
 
 export function Logo({ light = false }: { light?: boolean }) {
   const logo = getSetting('logo');
@@ -31,7 +32,6 @@ export function Logo({ light = false }: { light?: boolean }) {
 /* --------------------------------- Navbar -------------------------------- */
 export function Navbar() {
   const { cartCount, setCartOpen, session, logout } = useStore();
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -68,9 +68,13 @@ export function Navbar() {
 
   return (
     <header className={`sticky top-0 z-50 transition-all duration-300 ${scrolled ? 'bg-[#fffaf0]/90 shadow-md shadow-rose-100/60 backdrop-blur-lg' : 'bg-transparent'}`}>
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3.5 sm:px-6">
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-3.5 sm:px-4 sm:gap-4">
+        {/* Hamburger — always on the LEFT of the header (desktop & mobile) */}
+        <NavMenu />
+
         <Logo />
 
+        {/* Existing top nav — hidden on mobile (drawer takes over), shown on md+ */}
         <nav className="ml-6 hidden items-center gap-7 md:flex">{links}</nav>
 
         {/* live search */}
@@ -121,33 +125,6 @@ export function Navbar() {
             Logout
           </button>
         )}
-
-        {/* hamburger */}
-        <button onClick={() => setOpen(!open)} className="grid h-10 w-10 place-items-center rounded-full bg-white shadow-md ring-1 ring-rose-100 md:hidden" aria-label="Menu">
-          <div className="space-y-1.5">
-            <span className={`block h-0.5 w-5 rounded bg-[#7f4c5a] transition-all ${open ? 'translate-y-2 rotate-45' : ''}`} />
-            <span className={`block h-0.5 w-5 rounded bg-[#7f4c5a] transition-all ${open ? 'opacity-0' : ''}`} />
-            <span className={`block h-0.5 w-5 rounded bg-[#7f4c5a] transition-all ${open ? '-translate-y-2 -rotate-45' : ''}`} />
-          </div>
-        </button>
-      </div>
-
-      {/* mobile menu */}
-      <div className={`overflow-hidden transition-all duration-300 md:hidden ${open ? 'max-h-72' : 'max-h-0'}`}>
-        <nav className="flex flex-col gap-4 bg-[#fffaf0]/95 px-6 pb-5 pt-2 backdrop-blur" onClick={() => setOpen(false)}>
-          {links}
-          <input
-            placeholder="Search…"
-            className="input-soft"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { nav(`/shop?q=${encodeURIComponent((e.target as HTMLInputElement).value)}`); setOpen(false); }
-            }}
-          />
-          {session && session.role === 'customer' && (
-            <button onClick={logout} className="text-left text-sm font-medium text-rose-400">Logout ({session.username})</button>
-          )}
-        </nav>
       </div>
     </header>
   );
