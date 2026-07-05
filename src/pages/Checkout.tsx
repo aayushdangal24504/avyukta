@@ -496,9 +496,8 @@ export default function Checkout() {
 
               <div className="rounded-2xl bg-rose-50/60 p-5 ring-1 ring-rose-100">
                 <p className="text-sm leading-relaxed text-[#6b5560]">
-                  By tapping <strong>Place Order</strong>, you confirm the details
-                  above and agree to our terms. We&rsquo;ll send a confirmation
-                  email and contact you shortly to arrange payment &amp; delivery.
+                 **No payment is required at this time. We will review and confirm your order first, then contact you by message or phone call with the payment details.**
+
                 </p>
               </div>
 
@@ -513,7 +512,7 @@ export default function Checkout() {
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="grid h-5 w-5 place-items-center rounded-full bg-gradient-to-br from-[#b56576] to-[#d291bc] text-[10px] text-white">✓</span>
-                  Email confirmation &amp; tracking code
+                 You will recieve Message or call about confirmation &amp; tracking code
                 </li>
               </ul>
 
