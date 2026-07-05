@@ -814,8 +814,8 @@ function SuccessPage({
                 💵
               </div>
               <div>
-                <p className="text-sm font-semibold text-[#5d4954]">Cash on Delivery</p>
-                <p className="text-[11px] text-[#a98993]">Pay when your order arrives</p>
+                <p className="text-sm font-semibold text-[#5d4954]">Pay later</p>
+                <p className="text-[11px] text-[#a98993]">Pay only when we review and confirm</p>
               </div>
             </div>
           </div>
@@ -828,7 +828,7 @@ function SuccessPage({
                 🚚
               </div>
               <div>
-                <p className="text-sm font-semibold text-[#5d4954]">2–4 business days</p>
+                <p className="text-sm font-semibold text-[#5d4954]">1–4 business days</p>
                 <p className="text-[11px] text-[#a98993]">Hand-packed with care 🤍</p>
               </div>
             </div>
