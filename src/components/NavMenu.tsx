@@ -13,6 +13,7 @@
  *    whatever categories exist in the DB / Supabase.
  */
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { getCategoriesSorted } from '../lib/db';
 import { useStore } from '../lib/store';
@@ -431,7 +432,7 @@ export function NavMenu() {
 
   return (
     <>
-      {/* the always-visible hamburger trigger */}
+      {/* the always-visible hamburger trigger (stays inside the header) */}
       <HamburgerButton
         open={open}
         onClick={open ? closeMenu : openMenu}
@@ -439,55 +440,61 @@ export function NavMenu() {
         buttonRef={triggerRef}
       />
 
-      {/* panel (only when open or animating-out) */}
+      {/* panel + scrim rendered via a portal into document.body
+          so they escape any header stacking context (backdrop-filter, transform, etc.)
+          that would otherwise clip a position:fixed child. */}
       {open &&
-        (isMobile ? (
-          <>
-            {/* mobile scrim */}
-            <div
-              className={`fixed inset-0 z-[80] bg-[#41323a]/55 backdrop-blur-sm ${
-                closing ? 'menu-overlay-out' : 'menu-overlay-in'
-              }`}
-              onClick={closeMenu}
-              aria-hidden
-            />
-            <aside
-              id="avyukta-nav-menu"
-              ref={panelRef as React.Ref<HTMLElement>}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Main menu"
-              className={`fixed left-0 top-0 z-[85] flex h-full w-[88%] max-w-sm flex-col bg-[#fffaf0] shadow-2xl ring-1 ring-rose-100 ${
-                closing ? 'menu-drawer-out' : 'menu-drawer-in'
-              }`}
-            >
-              {PanelContent}
-            </aside>
-          </>
-        ) : (
-          <>
-            {/* desktop click-outside catcher (rendered below the panel in z-order) */}
-            {!closing && (
+        createPortal(
+          isMobile ? (
+            <>
+              {/* mobile scrim */}
               <div
-                className="fixed inset-0 z-[65]"
+                className={`fixed inset-0 z-[90] bg-[#41323a]/55 backdrop-blur-sm ${
+                  closing ? 'menu-overlay-out' : 'menu-overlay-in'
+                }`}
                 onClick={closeMenu}
                 aria-hidden
               />
-            )}
-            <aside
-              id="avyukta-nav-menu"
-              ref={panelRef as React.Ref<HTMLElement>}
-              role="dialog"
-              aria-modal="false"
-              aria-label="Main menu"
-              className={`fixed left-3 top-[72px] z-[70] flex max-h-[calc(100vh-100px)] w-[320px] origin-top-left flex-col overflow-hidden rounded-2xl bg-[#fffaf0] shadow-2xl ring-1 ring-rose-100 ${
-                closing ? 'menu-flyout-out' : 'menu-flyout-in'
-              }`}
-            >
-              {PanelContent}
-            </aside>
-          </>
-        ))}
+              <aside
+                id="avyukta-nav-menu"
+                ref={panelRef as React.Ref<HTMLElement>}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Main menu"
+                className={`fixed left-0 top-0 z-[95] flex h-full w-[88%] max-w-sm flex-col bg-[#fffaf0] shadow-2xl ring-1 ring-rose-100 ${
+                  closing ? 'menu-drawer-out' : 'menu-drawer-in'
+                }`}
+              >
+                {PanelContent}
+              </aside>
+            </>
+          ) : (
+            <>
+              {/* desktop click-outside catcher (rendered below the panel in z-order) */}
+              {!closing && (
+                <div
+                  className="fixed inset-0 z-[85]"
+                  onClick={closeMenu}
+                  aria-hidden
+                />
+              )}
+              <aside
+                id="avyukta-nav-menu"
+                ref={panelRef as React.Ref<HTMLElement>}
+                role="dialog"
+                aria-modal="false"
+                aria-label="Main menu"
+                style={{ top: '72px' }}
+                className={`fixed left-3 z-[88] flex max-h-[calc(100vh-90px)] w-[320px] origin-top-left flex-col overflow-hidden rounded-2xl bg-[#fffaf0] shadow-2xl ring-1 ring-rose-100 ${
+                  closing ? 'menu-flyout-out' : 'menu-flyout-in'
+                }`}
+              >
+                {PanelContent}
+              </aside>
+            </>
+          ),
+          document.body
+        )}
     </>
   );
 }
