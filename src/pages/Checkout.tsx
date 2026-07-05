@@ -504,7 +504,7 @@ export default function Checkout() {
               <ul className="space-y-2 text-sm text-[#5d4954]">
                 <li className="flex items-center gap-2">
                   <span className="grid h-5 w-5 place-items-center rounded-full bg-gradient-to-br from-[#b56576] to-[#d291bc] text-[10px] text-white">✓</span>
-                  Free delivery across the valley
+                  Delivery charge may be included
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="grid h-5 w-5 place-items-center rounded-full bg-gradient-to-br from-[#b56576] to-[#d291bc] text-[10px] text-white">✓</span>
