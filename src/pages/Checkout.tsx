@@ -463,10 +463,11 @@ export default function Checkout() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-[#5d4954]">
-                      Cash on Delivery
+                      About payment
                     </p>
                     <p className="text-xs text-[#a98993]">
-                      Pay in cash when your order arrives.
+                      **Payment details will be discussed via message or call after we review and confirm your order.**
+
                     </p>
                   </div>
                 </div>
