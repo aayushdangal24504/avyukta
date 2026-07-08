@@ -92,7 +92,7 @@ function Stepper({ current }: { current: 1 | 2 | 3 }) {
 
 /* --------------------------------- checkout ------------------------------- */
 export default function Checkout() {
-  const { cartProducts, cartTotal, clearCart, session, toast } = useStore();
+  const { cartProducts, cartTotal, clearCart, session, toast, setQty } = useStore();
   const nav = useNavigate();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -129,7 +129,7 @@ export default function Checkout() {
   const successTitle = getSetting('success_title') || '🎉 Order Placed Successfully!';
   const successMessage =
     getSetting('success_message') ||
-    'Thank you for your order. We have sent a confirmation email with your tracking details. Our team will reach out shortly to confirm payment and delivery.';
+    'Thank you for your order. We will send a confirmation message with your tracking details. Our team will reach out shortly to confirm payment and delivery.';
   const trackingNote =
     getSetting('tracking_note') ||
     '💡 Save or copy your tracking number to keep track of your order through this site.';
@@ -546,24 +546,49 @@ export default function Checkout() {
         <aside className="anim-up h-fit rounded-3xl bg-gradient-to-br from-[#7f4c5a] to-[#b56576] p-5 text-white shadow-xl sm:p-7 lg:sticky lg:top-24 lg:col-span-2">
           <h2 className="font-display text-lg font-bold">Order Summary</h2>
           <ul className="mt-5 space-y-4">
-            {cartProducts.map(({ product, quantity }) => (
-              <li key={product.id} className="flex items-center gap-3">
-                <SafeImage
-                  src={product.images?.[0]}
-                  alt=""
-                  className="h-12 w-12 rounded-xl ring-2 ring-white/30"
-                  imgClassName="object-cover"
-                />
-                <div className="flex-1 text-sm">
-                  <p className="font-medium">{product.name}</p>
-                  <p className="text-xs text-rose-100/80">× {quantity}</p>
-                </div>
-                <span className="text-sm font-semibold">
-                  {money(product.price * quantity)}
-                </span>
-              </li>
-            ))}
-          </ul>
+  {cartProducts.map(({ product, quantity }) => (
+    <li key={product.id} className="flex items-center gap-3">
+      <SafeImage
+        src={product.images?.[0]}
+        alt=""
+        className="h-12 w-12 rounded-xl ring-2 ring-white/30"
+        imgClassName="object-cover"
+      />
+      <div className="flex-1 text-sm">
+        <p className="font-medium">{product.name}</p>
+        <p className="text-xs text-rose-100/80">
+          {money(product.price)} each
+        </p>
+        <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/15 px-1.5 py-0.5">
+          <button
+            type="button"
+            onClick={() => setQty(product.id, quantity - 1)}
+            className="grid h-6 w-6 place-items-center rounded-full bg-white/90 text-sm font-bold text-[#7f4c5a] transition active:scale-90 hover:bg-white"
+            aria-label={`Decrease ${product.name}`}
+          >
+            −
+          </button>
+          <span className="min-w-5 text-center text-xs font-semibold">
+            {quantity}
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              setQty(product.id, Math.min(quantity + 1, product.stock || 99))
+            }
+            className="grid h-6 w-6 place-items-center rounded-full bg-white/90 text-sm font-bold text-[#7f4c5a] transition active:scale-90 hover:bg-white"
+            aria-label={`Increase ${product.name}`}
+          >
+            +
+          </button>
+        </div>
+      </div>
+      <span className="text-sm font-semibold">
+        {money(product.price * quantity)}
+      </span>
+    </li>
+  ))}
+</ul>
           <div className="mt-6 space-y-2 border-t border-white/20 pt-4 text-sm">
             <div className="flex justify-between text-rose-100/90">
               <span>Delivery</span>
