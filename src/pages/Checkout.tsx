@@ -560,26 +560,14 @@ export default function Checkout() {
           {money(product.price)} each
         </p>
         <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/15 px-1.5 py-0.5">
-          <button
+           <button
             type="button"
-            onClick={() => setQty(product.id, quantity - 1)}
-            className="grid h-6 w-6 place-items-center rounded-full bg-white/90 text-sm font-bold text-[#7f4c5a] transition active:scale-90 hover:bg-white"
+            onClick={() => quantity > 1 && setQty(product.id, quantity - 1)}
+            disabled={quantity <= 1}
+            className="grid h-6 w-6 place-items-center rounded-full bg-white/90 text-sm font-bold text-[#7f4c5a] transition active:scale-90 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/90"
             aria-label={`Decrease ${product.name}`}
           >
             −
-          </button>
-          <span className="min-w-5 text-center text-xs font-semibold">
-            {quantity}
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              setQty(product.id, Math.min(quantity + 1, product.stock || 99))
-            }
-            className="grid h-6 w-6 place-items-center rounded-full bg-white/90 text-sm font-bold text-[#7f4c5a] transition active:scale-90 hover:bg-white"
-            aria-label={`Increase ${product.name}`}
-          >
-            +
           </button>
         </div>
       </div>
