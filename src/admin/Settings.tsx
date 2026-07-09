@@ -11,7 +11,7 @@ import { fileToCompressedDataURL, uploadProductImage } from '../lib/storage';
 const CONTENT_KEYS = [
   'store_name', 'tagline',
   'phone', 'email', 'address', 'website', 'business_hours',
-  'instagram', 'facebook', 'tiktok', 'whatsapp',
+  'instagram', 'tiktok', 'whatsapp',
   'hero_title', 'hero_subtitle', 'hero_cta', 'hero_cta2', 'hero_stats',
   'categories_kicker', 'categories_title',
   'featured_kicker', 'featured_title', 'new_title', 'best_title',
@@ -262,7 +262,7 @@ export default function AdminSettings() {
           {area('business_hours', 'Business hours', 3, 'One line per day, e.g. "Mon–Fri: 9am–6pm"')}
           <div className="grid gap-4 sm:grid-cols-3">
             {field('instagram', 'Instagram URL')}
-            {field('Tiktok', 'Tiktok URL')}
+            {field('tiktok', 'Tiktok URL')}
             {field('whatsapp', 'WhatsApp URL')}
           </div>
         </div>
