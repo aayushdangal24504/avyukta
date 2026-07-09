@@ -262,7 +262,7 @@ export default function AdminSettings() {
           {area('business_hours', 'Business hours', 3, 'One line per day, e.g. "Mon–Fri: 9am–6pm"')}
           <div className="grid gap-4 sm:grid-cols-3">
             {field('instagram', 'Instagram URL')}
-            {field('facebook', 'Facebook URL')}
+            {field('Tiktok', 'Tiktok URL')}
             {field('whatsapp', 'WhatsApp URL')}
           </div>
         </div>
