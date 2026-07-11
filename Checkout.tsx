@@ -253,7 +253,7 @@ export default function Checkout() {
             ))}
           </ul>
           <div className="mt-6 space-y-2 border-t border-white/20 pt-4 text-sm">
-            <div className="flex justify-between text-rose-100/90"><span>Delivery</span><span>Free 🤍</span></div>
+            <div className="flex justify-between text-rose-100/90"><span>Delivery</span><span>N/A 🤍</span></div>
             <div className="flex justify-between font-display text-xl font-bold"><span>Total</span><span>{money(cartTotal)}</span></div>
           </div>
           {footerNote && (

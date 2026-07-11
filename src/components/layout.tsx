@@ -29,6 +29,86 @@ export function Logo({ light = false }: { light?: boolean }) {
   );
 }
 
+/* ------------------------------ Contact Us -------------------------------- */
+/** Top-bar "Contact Us" pill → dropdown with Instagram / TikTok / WhatsApp.
+ *  Opens on hover (desktop) and on click/tap (touch), closes on Esc / outside
+ *  click / picking a link. Hidden entirely if no social links are configured. */
+function ContactUsMenu() {
+  const instagram = getSetting('instagram');
+  const tiktok = getSetting('tiktok');
+  const whatsapp = getSetting('whatsapp');
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const items = (
+    [
+      { label: 'Instagram', icon: '📷', url: instagram },
+      { label: 'TikTok', icon: '♪', url: tiktok },
+      { label: 'WhatsApp', icon: '💬', url: whatsapp },
+    ] as { label: string; icon: string; url: string }[]
+  ).filter((i) => !!i.url);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div
+      ref={ref}
+      className="relative hidden sm:block"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="true"
+        aria-expanded={open}
+        className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#7f4c5a] shadow-sm ring-1 ring-rose-100 transition hover:shadow-md hover:ring-rose-200 active:scale-95"
+      >
+        Contact Us
+        <span className={`text-[10px] transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▾</span>
+      </button>
+
+      <div
+        role="menu"
+        className={`absolute right-0 top-[calc(100%+10px)] z-10 w-48 origin-top-right rounded-2xl bg-white p-2 shadow-xl ring-1 ring-rose-100 transition-all duration-200 ${
+          open ? 'pointer-events-auto scale-100 opacity-100' : 'pointer-events-none scale-95 opacity-0'
+        }`}
+      >
+        {items.map((it) => (
+          <a
+            key={it.label}
+            href={it.url}
+            target="_blank"
+            rel="noreferrer"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[#5d4954] transition hover:bg-[#fff3ef]"
+          >
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#fcd5ce] to-[#f8b4c0] text-sm">
+              {it.icon}
+            </span>
+            {it.label}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* --------------------------------- Navbar -------------------------------- */
 export function Navbar() {
   const { cartCount, setCartOpen, session, logout } = useStore();
@@ -77,54 +157,59 @@ export function Navbar() {
         {/* Existing top nav — hidden on mobile (drawer takes over), shown on md+ */}
         <nav className="ml-6 hidden items-center gap-7 md:flex">{links}</nav>
 
-        {/* live search */}
-        <div ref={boxRef} className="relative ml-auto hidden w-64 lg:block">
-          <input
-            value={query}
-            onChange={(e) => { setQuery(e.target.value); setShowResults(true); }}
-            onFocus={() => setShowResults(true)}
-            placeholder="Search…"
-            className="input-soft py-2! pl-9"
-          />
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-rose-300">⌕</span>
-          {showResults && query.trim() && (
-            <div className="anim-fade absolute mt-2 w-full overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-rose-100">
-              {results.length === 0 && <p className="p-4 text-sm text-rose-300">No matches for “{query}”</p>}
-              {results.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => { setShowResults(false); setQuery(''); nav(`/product/${p.id}`); }}
-                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-[#fff3ef]"
-                >
-                  <SafeImage src={p.images?.[0]} alt="" className="h-10 w-10 rounded-lg" imgClassName="object-cover" />
-                  <span className="flex-1 text-sm font-medium text-[#5d4954]">{p.name}</span>
-                  <span className="text-xs font-semibold text-[#b56576]">{money(p.price)}</span>
-                </button>
-              ))}
-            </div>
+        {/* right-side controls: search, contact us, cart, logout — always pinned right */}
+        <div className="ml-auto flex items-center gap-3 sm:gap-4">
+          {/* live search */}
+          <div ref={boxRef} className="relative hidden w-64 lg:block">
+            <input
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setShowResults(true); }}
+              onFocus={() => setShowResults(true)}
+              placeholder="Search…"
+              className="input-soft py-2! pl-9"
+            />
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-rose-300">⌕</span>
+            {showResults && query.trim() && (
+              <div className="anim-fade absolute mt-2 w-full overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-rose-100">
+                {results.length === 0 && <p className="p-4 text-sm text-rose-300">No matches for “{query}”</p>}
+                {results.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => { setShowResults(false); setQuery(''); nav(`/product/${p.id}`); }}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-[#fff3ef]"
+                  >
+                    <SafeImage src={p.images?.[0]} alt="" className="h-10 w-10 rounded-lg" imgClassName="object-cover" />
+                    <span className="flex-1 text-sm font-medium text-[#5d4954]">{p.name}</span>
+                    <span className="text-xs font-semibold text-[#b56576]">{money(p.price)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <ContactUsMenu />
+
+          {/* cart button */}
+          <button
+            id="cart-btn"
+            onClick={() => setCartOpen(true)}
+            className="relative grid h-10 w-10 place-items-center rounded-full bg-white text-lg shadow-md ring-1 ring-rose-100 transition hover:scale-105 active:scale-95"
+            aria-label="Open cart"
+          >
+            🛍️
+            {cartCount > 0 && (
+              <span className="anim-pop absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-gradient-to-br from-[#b56576] to-[#d291bc] px-1 text-[10px] font-bold text-white shadow">
+                {cartCount}
+              </span>
+            )}
+          </button>
+
+          {session && session.role === 'customer' && (
+            <button onClick={() => logout()} className="hidden text-xs font-medium text-rose-400 transition hover:text-[#b56576] md:block">
+              Logout
+            </button>
           )}
         </div>
-
-        {/* cart button */}
-        <button
-          id="cart-btn"
-          onClick={() => setCartOpen(true)}
-          className="relative ml-auto grid h-10 w-10 place-items-center rounded-full bg-white text-lg shadow-md ring-1 ring-rose-100 transition hover:scale-105 active:scale-95 lg:ml-0"
-          aria-label="Open cart"
-        >
-          🛍️
-          {cartCount > 0 && (
-            <span className="anim-pop absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-gradient-to-br from-[#b56576] to-[#d291bc] px-1 text-[10px] font-bold text-white shadow">
-              {cartCount}
-            </span>
-          )}
-        </button>
-
-        {session && session.role === 'customer' && (
-          <button onClick={() => logout()} className="hidden text-xs font-medium text-rose-400 transition hover:text-[#b56576] md:block">
-            Logout
-          </button>
-        )}
       </div>
     </header>
   );
