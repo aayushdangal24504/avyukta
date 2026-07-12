@@ -67,7 +67,7 @@ function ContactUsMenu() {
   return (
     <div
       ref={ref}
-      className="relative hidden sm:block"
+      className="relative"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
@@ -76,10 +76,12 @@ function ContactUsMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="true"
         aria-expanded={open}
-        className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#7f4c5a] shadow-sm ring-1 ring-rose-100 transition hover:shadow-md hover:ring-rose-200 active:scale-95"
+        aria-label="Contact Us"
+        className="flex h-10 w-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-white text-sm font-semibold text-[#7f4c5a] shadow-sm ring-1 ring-rose-100 transition hover:shadow-md hover:ring-rose-200 active:scale-95 sm:h-auto sm:w-auto sm:px-4 sm:py-2"
       >
-        Contact Us
-        <span className={`text-[10px] transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▾</span>
+        <span className="text-base leading-none sm:hidden" aria-hidden="true">💬</span>
+        <span className="hidden sm:inline">Contact Us</span>
+        <span className={`hidden text-[10px] transition-transform duration-200 sm:inline ${open ? 'rotate-180' : ''}`}>▾</span>
       </button>
 
       <div
