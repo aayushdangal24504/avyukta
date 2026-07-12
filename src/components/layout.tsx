@@ -83,27 +83,33 @@ function ContactUsMenu() {
       </button>
 
       <div
-        role="menu"
-        className={`absolute right-0 top-[calc(100%+10px)] z-10 w-48 origin-top-right rounded-2xl bg-white p-2 shadow-xl ring-1 ring-rose-100 transition-all duration-200 ${
-          open ? 'pointer-events-auto scale-100 opacity-100' : 'pointer-events-none scale-95 opacity-0'
+        className={`absolute right-0 top-full w-48 pt-2 transition-opacity duration-200 ${
+          open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >
-        {items.map((it) => (
-          <a
-            key={it.label}
-            href={it.url}
-            target="_blank"
-            rel="noreferrer"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[#5d4954] transition hover:bg-[#fff3ef]"
-          >
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#fcd5ce] to-[#f8b4c0] text-sm">
-              {it.icon}
-            </span>
-            {it.label}
-          </a>
-        ))}
+        <div
+          role="menu"
+          className={`w-full origin-top-right rounded-2xl bg-white p-2 shadow-xl ring-1 ring-rose-100 transition-transform duration-200 ${
+            open ? 'scale-100' : 'scale-95'
+          }`}
+        >
+          {items.map((it) => (
+            <a
+              key={it.label}
+              href={it.url}
+              target="_blank"
+              rel="noreferrer"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[#5d4954] transition hover:bg-[#fff3ef]"
+            >
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#fcd5ce] to-[#f8b4c0] text-sm">
+                {it.icon}
+              </span>
+              {it.label}
+            </a>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { getCategoriesSorted } from '../lib/db';
+import { getCategoriesSorted, getSetting } from '../lib/db';
 import { useStore } from '../lib/store';
 import { SafeImage } from './ui';
 
@@ -87,6 +87,7 @@ export function NavMenu() {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [catOpen, setCatOpen] = useState(true);
+  const [contactOpen, setContactOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const location = useLocation();
   const nav = useNavigate();
@@ -230,6 +231,15 @@ export function NavMenu() {
     i.dynamic === 'account' ? { ...i, label: accountLabel } : i
   );
 
+  /* ---- contact us (same socials as top-bar Contact Us button) ---- */
+  const contactItems = (
+    [
+      { label: 'Instagram', icon: '📷', url: getSetting('instagram') },
+      { label: 'TikTok', icon: '♪', url: getSetting('tiktok') },
+      { label: 'WhatsApp', icon: '💬', url: getSetting('whatsapp') },
+    ] as { label: string; icon: string; url: string }[]
+  ).filter((i) => !!i.url);
+
   /* ---- panel content (shared between mobile drawer and desktop flyout) ---- */
   const PanelContent = (
     <div className="flex h-full flex-col">
@@ -371,6 +381,65 @@ export function NavMenu() {
               </ul>
             </div>
           </li>
+
+          {/* ---- Contact Us (accordion) — same links as the top-bar Contact Us button ---- */}
+          {contactItems.length > 0 && (
+            <li
+              className="menu-stagger pt-2"
+              style={{ animationDelay: `${(items.length + 1) * 35}ms` }}
+            >
+              <button
+                type="button"
+                onClick={() => setContactOpen((v) => !v)}
+                aria-expanded={contactOpen}
+                aria-controls="nav-contact"
+                className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold text-[#5d4954] transition-all hover:bg-rose-50/70 hover:text-[#b56576]"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60" />
+                  Contact Us
+                </span>
+                <svg
+                  viewBox="0 0 20 20"
+                  className={`h-4 w-4 transition-transform duration-300 ${
+                    contactOpen ? 'rotate-180' : ''
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M5 7.5l5 5 5-5" />
+                </svg>
+              </button>
+
+              <div
+                id="nav-contact"
+                className={contactOpen ? 'menu-accordion-down' : 'menu-accordion-up'}
+                aria-hidden={!contactOpen}
+              >
+                <ul className="mt-1 space-y-0.5 pl-4">
+                  {contactItems.map((it) => (
+                    <li key={it.label}>
+                      <a
+                        href={it.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={handleNavClick}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-[#6b5560] transition hover:bg-rose-50/60 hover:text-[#b56576]"
+                      >
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-gradient-to-br from-[#fcd5ce] to-[#f8b4c0] text-xs">
+                          {it.icon}
+                        </span>
+                        <span>{it.label}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </li>
+          )}
         </ul>
 
         {/* ---- account / auth footer ---- */}
