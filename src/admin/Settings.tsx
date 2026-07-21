@@ -1,7 +1,7 @@
 /** Admin settings: password, store info, and FULL homepage content editing.
  *  PRODUCTION-CLEAN: empty inputs by default, no demo defaults, no demo reset. */
 import { useRef, useState } from 'react';
-import { getDB, saveDB, getSetting, hashPassword, checkPassword, sanitize } from '../lib/db';
+import { getDB, saveDB, getSetting, hashPassword, checkPassword, sanitize, type Product } from '../lib/db';
 import { useStore } from '../lib/store';
 import { Spinner, SafeImage } from '../components/ui';
 import CloudSync from './CloudSync';
@@ -50,6 +50,12 @@ export default function AdminSettings() {
   const [busyPw, setBusyPw] = useState(false);
   const [uploading, setUploading] = useState<ImageKey | ''>('');
 
+  /* ---- 3D ring photo picker (top-of-homepage rotating ring) ---- */
+  const [ringIds, setRingIds] = useState<number[]>(() =>
+    getSetting('ring_product_ids').split(',').map((s) => parseInt(s, 10)).filter((n) => n > 0)
+  );
+  const [ringBusy, setRingBusy] = useState(false);
+
   // separate refs per image input
   const logoRef = useRef<HTMLInputElement>(null);
   const heroRef = useRef<HTMLInputElement>(null);
@@ -63,6 +69,35 @@ export default function AdminSettings() {
     saveDB();
     setBusyInfo(false);
     toast('Saved ✓');
+  };
+
+  /* ---- ring picker helpers ---- */
+  const ringProducts = ringIds
+    .map((id) => db.products.find((p) => p.id === id))
+    .filter(Boolean) as Product[];
+  const available = [...db.products]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .filter((p) => !ringIds.includes(p.id));
+  const moveRing = (i: number, dir: number) => {
+    const j = i + dir;
+    if (j < 0 || j >= ringIds.length) return;
+    const a = [...ringIds];
+    [a[i], a[j]] = [a[j], a[i]];
+    setRingIds(a);
+  };
+  const saveRing = async () => {
+    setRingBusy(true);
+    await new Promise((r) => setTimeout(r, 200));
+    db.settings.ring_product_ids = ringIds.join(',');
+    saveDB();
+    setRingBusy(false);
+    toast('3D ring saved ✓');
+  };
+  const clearRing = () => {
+    setRingIds([]);
+    db.settings.ring_product_ids = '';
+    saveDB();
+    toast('Ring set to automatic.');
   };
 
   /** Clear ALL text content fields (does NOT touch images, products, orders, etc). */
@@ -328,6 +363,61 @@ export default function AdminSettings() {
               <li>Copy the product's <b>ID</b> (visible in the products list) and paste it above.</li>
               <li>Save. The showcase appears instantly on the homepage.</li>
             </ol>
+          </div>
+        </div>
+
+        {/* 3D ring photo picker (top of homepage) */}
+        <div className="anim-up space-y-4 rounded-3xl bg-white p-7 shadow-sm ring-1 ring-rose-50" style={{ animationDelay: '.19s' }}>
+          {sectionTitle('🎡', '3D Ring Photos (top of homepage)', 'Pick exactly which product photos spin on the 3D ring at the very top of your homepage, and in what order. Choose from your product list. Save is independent of the big “Save content” button below.')}
+
+          {/* currently on the ring, in order */}
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#a98993]">On the ring (in order)</p>
+            {ringProducts.length === 0 ? (
+              <p className="rounded-2xl bg-rose-50/60 p-4 text-xs leading-relaxed text-[#8c737e]">
+                No products selected. When this is empty the ring runs <b>automatically</b>: it uses your visible product covers, or the built‑in brand photos if you have fewer than 3 products.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {ringProducts.map((p, i) => (
+                  <li key={p.id} className="flex items-center gap-3 rounded-2xl bg-rose-50/50 p-2 ring-1 ring-rose-100">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white text-[11px] font-bold text-[#b56576] ring-1 ring-rose-100">{i + 1}</span>
+                    <SafeImage src={p.images?.[0]} alt={p.name} className="h-12 w-12 shrink-0 rounded-xl" imgClassName="object-cover" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#5d4954]">{p.name}</span>
+                    {!p.is_visible && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-600">hidden</span>}
+                    <div className="flex items-center gap-1">
+                      <button type="button" disabled={i === 0} onClick={() => moveRing(i, -1)} className="grid h-8 w-8 place-items-center rounded-full bg-white text-sm text-[#7f4c5a] ring-1 ring-rose-100 transition hover:bg-rose-50 disabled:opacity-30" aria-label="Move up">↑</button>
+                      <button type="button" disabled={i === ringProducts.length - 1} onClick={() => moveRing(i, 1)} className="grid h-8 w-8 place-items-center rounded-full bg-white text-sm text-[#7f4c5a] ring-1 ring-rose-100 transition hover:bg-rose-50 disabled:opacity-30" aria-label="Move down">↓</button>
+                      <button type="button" onClick={() => setRingIds(ringIds.filter((x) => x !== p.id))} className="grid h-8 w-8 place-items-center rounded-full bg-red-50 text-sm text-red-500 ring-1 ring-red-100 transition hover:bg-red-100" aria-label="Remove">✕</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* available products to add */}
+          {available.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#a98993]">Add a product</p>
+              <div className="grid max-h-72 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                {available.map((p) => (
+                  <button type="button" key={p.id} onClick={() => setRingIds([...ringIds, p.id])} className="flex items-center gap-3 rounded-2xl bg-white p-2 text-left ring-1 ring-rose-100 transition hover:bg-rose-50 hover:ring-rose-200">
+                    <SafeImage src={p.images?.[0]} alt={p.name} className="h-11 w-11 shrink-0 rounded-xl" imgClassName="object-cover" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#5d4954]">{p.name}</span>
+                    {!p.is_visible && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-600">hidden</span>}
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#b56576] to-[#d291bc] text-sm text-white">+</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
+            <button type="button" onClick={clearRing} className="rounded-full bg-rose-50 px-5 py-2 text-xs font-semibold text-[#7f4c5a] transition hover:bg-rose-100">Use automatic</button>
+            <button type="button" onClick={saveRing} disabled={ringBusy} className="btn-grad rounded-full px-8 py-2.5 text-xs font-semibold disabled:opacity-70">
+              {ringBusy ? <span className="inline-flex items-center gap-2"><Spinner /> Saving…</span> : '💾 Save ring'}
+            </button>
           </div>
         </div>
 

@@ -18,8 +18,8 @@
  * Supabase, else the curated brand photos bundled in src/assets/showcase.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { getVisibleProducts } from '../lib/db';
+import { useEffect, useRef, useState } from 'react';
+import { getDB, getSetting, getVisibleProducts } from '../lib/db';
 import { useStore } from '../lib/store';
 
 import s1 from '../assets/showcase/s1.jpg';
@@ -94,12 +94,28 @@ export function Scroll3DHero() {
     };
   }, []);
 
-  const frames = useMemo(() => {
+  // Photo source priority:
+  //   1) Admin-selected products (Settings → "3D Ring Photos"), in chosen order.
+  //   2) Auto: visible product covers if >= 3, else the bundled brand photos.
+  // Computed each render (cheap) so admin edits show up without a hard reload.
+  const frames = (() => {
+    const db = getDB();
+    const ids = getSetting('ring_product_ids')
+      .split(',')
+      .map((s) => parseInt(s, 10))
+      .filter((n) => n > 0);
+    if (ids.length) {
+      const imgs = ids
+        .map((id) => db.products.find((p) => p.id === id))
+        .map((p) => p?.images?.[0] || p?.images_detail?.[0] || '')
+        .filter(Boolean);
+      if (imgs.length) return imgs;
+    }
     const live = getVisibleProducts()
       .map((p) => p.images?.[0] || p.images_detail?.[0] || '')
       .filter(Boolean);
     return live.length >= 3 ? live.slice(0, 8) : BUNDLED;
-  }, []);
+  })();
 
   const mobile = vw < 900;
   const n = frames.length;
