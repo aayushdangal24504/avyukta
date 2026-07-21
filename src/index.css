@@ -187,3 +187,10 @@ body.menu-open { overflow: hidden; }
   color: transparent;
   animation: gradShift 6s ease infinite;
 }
+
+/* --------------------- 3D rotating showcase (scroll hero) ----------------- */
+@keyframes av-spin3d { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+.av-spin3d { animation: av-spin3d 32s linear infinite; transform-style: preserve-3d; }
+@keyframes av-bob { 0%,100% { transform: translateY(0); opacity: .8; } 50% { transform: translateY(6px); opacity: .35; } }
+.av-bob { animation: av-bob 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .av-spin3d { animation: none; } .av-bob { animation: none; } }

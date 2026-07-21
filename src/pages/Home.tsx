@@ -1,13 +1,14 @@
 /** Storefront home — fully Supabase-driven.
  *  Every section is rendered only when its data exists; otherwise it's hidden.
  *  No hardcoded titles, copy, testimonials, stats, or images. */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getCategoriesSorted, getSetting, getVisibleProducts } from '../lib/db';
 import { useStore } from '../lib/store';
 import { EmptyState, Reveal, SkeletonCard, Tilt, SafeImage } from '../components/ui';
 import { RichText } from '../components/RichText';
 import { ProductShowcase3D } from '../components/ProductShowcase3D';
+import { Scroll3DHero } from '../components/Scroll3DHero';
 import { ProductCard } from '../components/ProductCard';
 
 function parseTestimonials(): { name: string; text: string }[] {
@@ -36,20 +37,29 @@ export default function Home() {
   useStore();
   const nav = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [scrollY, setScrollY] = useState(0);
+  const [heroLocal, setHeroLocal] = useState(0);
   const [tIdx, setTIdx] = useState(0);
+  const heroRef = useRef<HTMLElement>(null);
 
   const testimonials = parseTestimonials();
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 500);
-    const fn = () => setScrollY(window.scrollY);
+    // Parallax must be relative to the hero's OWN position (it now sits below the
+    // 3D scroll hero), not the global scroll position — otherwise the offset would
+    // be huge and the hero image would be shifted up and clipped by overflow-hidden.
+    const fn = () => {
+      const el = heroRef.current;
+      setHeroLocal(el ? Math.max(0, -el.getBoundingClientRect().top) : 0);
+    };
+    fn();
     window.addEventListener('scroll', fn, { passive: true });
+    window.addEventListener('resize', fn);
     const ti = setInterval(
       () => setTIdx((i) => (i + 1) % Math.max(1, testimonials.length)),
       4500
     );
-    return () => { clearTimeout(t); window.removeEventListener('scroll', fn); clearInterval(ti); };
+    return () => { clearTimeout(t); window.removeEventListener('scroll', fn); window.removeEventListener('resize', fn); clearInterval(ti); };
   }, [testimonials.length]);
 
   const products = getVisibleProducts();
@@ -105,32 +115,38 @@ export default function Home() {
   /* --------- nothing configured yet → show a single welcoming empty state --------- */
   if (!hasAnyContent && !loading) {
     return (
-      <div className="page-enter mx-auto max-w-3xl px-6 py-24">
-        <EmptyState
-          icon="✨"
-          title="Welcome"
-          sub="No content has been added yet. Sign in to the admin panel to configure your store, add products, and publish content."
-          action={
-            <Link to="/admin/login" className="btn-grad rounded-full px-7 py-2.5 text-sm font-semibold">
-              Open admin
-            </Link>
-          }
-        />
+      <div className="page-enter">
+        <Scroll3DHero />
+        <div className="mx-auto max-w-3xl px-6 py-24">
+          <EmptyState
+            icon="✨"
+            title="Welcome"
+            sub="No content has been added yet. Sign in to the admin panel to configure your store, add products, and publish content."
+            action={
+              <Link to="/admin/login" className="btn-grad rounded-full px-7 py-2.5 text-sm font-semibold">
+                Open admin
+              </Link>
+            }
+          />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="page-enter">
+      {/* ================= 3D ROAMING HERO (scroll-driven, top of page) ================= */}
+      <Scroll3DHero />
+
       {/* ================================ HERO ================================ */}
       {hasAnyHeroContent && (
-        <section className="relative overflow-hidden">
-          <div className="blob absolute -left-24 top-10 h-80 w-80 rounded-full bg-[#fcd5ce]/70" style={{ transform: `translateY(${scrollY * 0.25}px)` }} />
-          <div className="blob absolute -right-20 top-40 h-96 w-96 rounded-full bg-[#d291bc]/30" style={{ transform: `translateY(${scrollY * 0.15}px)`, animationDelay: '-4s' }} />
-          <div className="blob absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-[#b56576]/20" style={{ transform: `translateY(${scrollY * 0.35}px)`, animationDelay: '-8s' }} />
+        <section ref={heroRef} className="relative overflow-hidden">
+          <div className="blob absolute -left-24 top-10 h-80 w-80 rounded-full bg-[#fcd5ce]/70" style={{ transform: `translateY(${heroLocal * 0.25}px)` }} />
+          <div className="blob absolute -right-20 top-40 h-96 w-96 rounded-full bg-[#d291bc]/30" style={{ transform: `translateY(${heroLocal * 0.15}px)`, animationDelay: '-4s' }} />
+          <div className="blob absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-[#b56576]/20" style={{ transform: `translateY(${heroLocal * 0.35}px)`, animationDelay: '-8s' }} />
 
           <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-6 py-16 md:grid-cols-2 md:py-24">
-            <div style={{ transform: `translateY(${scrollY * -0.06}px)` }}>
+            <div style={{ transform: `translateY(${heroLocal * -0.06}px)` }}>
               {tagline && (
                 <p className="anim-up inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-1.5 text-xs font-semibold tracking-widest text-[#b56576] shadow-sm ring-1 ring-rose-100" style={{ animationDelay: '.05s' }}>
                   ✿ {tagline}
@@ -172,7 +188,7 @@ export default function Home() {
 
             {/* hero visual — only shown if at least one product image exists or a custom hero_image is set */}
             {(heroImage || ringImgs.length > 0) && (
-              <div className="relative hidden h-[420px] md:block" style={{ transform: `translateY(${scrollY * -0.12}px)`, perspective: '1100px' }}>
+              <div className="relative hidden h-[420px] md:block" style={{ transform: `translateY(${heroLocal * -0.12}px)`, perspective: '1100px' }}>
                 {ringImgs.length > 0 && (
                   <div className="ring3d absolute left-1/2 top-1/2 h-0 w-0">
                     {ringImgs.map((src, i) => (
