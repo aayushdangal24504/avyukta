@@ -16,8 +16,12 @@ const URL_STORAGE = 'avyukta_sb_url';
 const KEY_STORAGE = 'avyukta_sb_anon_key';
 const DISABLED = '__disabled__';
 
-const ENV_URL = 'https://qmiqwihgremdfehaiccu.supabase.co';
-const ENV_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtaXF3aWhncmVtZGZlaGFpY2N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMzE3NDksImV4cCI6MjA5NjYwNzc0OX0.iWGSba3xeQOY5-ZPb1K3sWRd4HU5_HI_hKL-KZiIhM0';
+// Read at BUILD time from Vite env vars — set these in Vercel / Netlify (see
+// .env.example). The Supabase *anon* key is PUBLIC by design (it ships to every
+// browser); real security comes from Row-Level Security in Supabase, NOT from
+// hiding this key. Nothing is hard-coded in source.
+const ENV_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const ENV_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 let client: SupabaseClient | null = null;
 
 export function getSupabaseUrl(): string {
