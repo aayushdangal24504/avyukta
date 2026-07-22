@@ -30,7 +30,7 @@ import s5 from '../assets/showcase/s5.jpg';
 import s6 from '../assets/showcase/s6.jpg';
 
 /** Viewport-heights the user scrolls while the scene is pinned. */
-const SECTIONS = 3.2;
+const SECTIONS = 3.6;
 const BUNDLED = [s1, s2, s3, s4, s5, s6];
 
 /** The four messages, in order. Only one is visible at any scroll position. */
@@ -64,33 +64,45 @@ function envelope(p: number, [a, b, c, d]: [number, number, number, number]) {
 export function Scroll3DHero() {
   useStore();
 
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(0); // eased / displayed progress
+  const targetRef = useRef(0); // raw scroll target 0..1
+  const dispRef = useRef(0); // eased value that chases the target
+  const loopRef = useRef(0); // rAF handle for the smoothing loop
   const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
   const sectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { BUNDLED.forEach((s) => { const i = new Image(); i.src = s; }); }, []);
 
-  // Passive, rAF-throttled scroll progress (no hijacking).
+  // Smoothed scroll progress (no hijacking): the raw scroll position sets a
+  // *target*, and an eased value chases it every frame. This makes the ring
+  // rotate slowly and buttery-smooth — even when the user flicks the scroll —
+  // without locking the page or interfering with the menu.
   useEffect(() => {
-    let raf = 0;
-    const measure = () => {
-      raf = 0;
+    const setTarget = () => {
       const el = sectionRef.current;
-      if (!el) return;
+      if (!el) { targetRef.current = 0; return; }
       const rect = el.getBoundingClientRect();
       const total = rect.height - window.innerHeight;
-      const scrolled = clamp01(-rect.top / Math.max(1, total));
-      setProgress(total > 0 ? scrolled : 0);
+      targetRef.current = total > 0 ? clamp01(-rect.top / total) : 0;
     };
-    const onScroll = () => { if (!raf) raf = requestAnimationFrame(measure); };
-    const onResize = () => { setVw(window.innerWidth); measure(); };
-    measure();
+    const tick = () => {
+      const t = targetRef.current;
+      const d = dispRef.current + (t - dispRef.current) * 0.075; // lower = slower/laggier
+      dispRef.current = Math.abs(t - d) < 0.0005 ? t : d;
+      setProgress(dispRef.current);
+      loopRef.current = dispRef.current === t ? 0 : requestAnimationFrame(tick);
+    };
+    const kick = () => { if (!loopRef.current) loopRef.current = requestAnimationFrame(tick); };
+    const onScroll = () => { setTarget(); kick(); };
+    const onResize = () => { setVw(window.innerWidth); setTarget(); kick(); };
+    setTarget();
+    kick();
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onResize);
     return () => {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
-      if (raf) cancelAnimationFrame(raf);
+      if (loopRef.current) cancelAnimationFrame(loopRef.current);
     };
   }, []);
 

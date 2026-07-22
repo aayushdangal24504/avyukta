@@ -242,7 +242,7 @@ export function NavMenu() {
 
   /* ---- panel content (shared between mobile drawer and desktop flyout) ---- */
   const PanelContent = (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* panel header */}
       <div className="flex items-center justify-between border-b border-rose-100 px-5 py-4">
         <span className="font-display text-base font-bold tracking-[0.18em] text-[#7f4c5a]">
@@ -260,7 +260,7 @@ export function NavMenu() {
 
       {/* scrollable nav area */}
       <nav
-        className="flex-1 overflow-y-auto px-3 py-4"
+        className="min-h-0 flex-1 overflow-y-auto px-3 py-4"
         aria-label="Primary"
       >
         <ul className="space-y-1">
