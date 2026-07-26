@@ -4,7 +4,7 @@ import { getDB, saveDB, getOrderItems, money, Order, OrderStatus } from '../lib/
 import { useStore } from '../lib/store';
 import { EmptyState, StatusBadge } from '../components/ui';
 
-const STATUSES: OrderStatus[] = ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'];
+const STATUSES: OrderStatus[] = ['Pending', 'Confirmed and being prepared', 'Shipped(on the way)', 'Delivered', 'Cancelled'];
 
 export default function AdminOrders() {
   const { toast } = useStore();
