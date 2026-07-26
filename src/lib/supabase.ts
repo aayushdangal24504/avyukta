@@ -1,9 +1,11 @@
 /**
  * AVYUKTA — Supabase cloud sync layer (PRODUCTION-CLEAN).
  *
- *   - Supabase URL + anon key MUST be provided by the admin (Settings → Cloud Sync)
- *     or via Vite env vars (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).
- *     NOTHING is hard-coded in source.
+ *   - Supabase URL + anon key come from (in order): Vite env vars
+ *     (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY), a built-in PUBLIC fallback
+ *     below (the anon key is public by design — security is via Row-Level
+ *     Security, NOT key secrecy), or a value the admin pasted into
+ *     Settings → Cloud Sync (that browser only).
  *   - On app load: pull cloud data → hydrate local cache.
  *   - On every save: debounced diff-push (only rows YOU changed/deleted).
  *   - We NEVER auto-seed an empty Supabase project.
@@ -16,12 +18,25 @@ const URL_STORAGE = 'avyukta_sb_url';
 const KEY_STORAGE = 'avyukta_sb_anon_key';
 const DISABLED = '__disabled__';
 
-// Read at BUILD time from Vite env vars — set these in Vercel / Netlify (see
-// .env.example). The Supabase *anon* key is PUBLIC by design (it ships to every
-// browser); real security comes from Row-Level Security in Supabase, NOT from
-// hiding this key. Nothing is hard-coded in source.
-const ENV_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const ENV_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Supabase URL + anon key source order: (1) Vite env vars at build time
+// (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY — set in Vercel/Netlify to override),
+// else (2) the PUBLIC fallback below, else (3) a value the admin pasted into
+// Settings → Cloud Sync (stored in that browser only).
+//
+// WHY a key in source is OK here: the Supabase *anon* key is PUBLIC by design —
+// it ships to every visitor's browser anyway. It is NOT a secret. The real
+// security is Row-Level Security in the database (supabase/schema.secure.sql),
+// which stops the public from reading orders/users or writing anything. The only
+// TRUE secrets (SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY) live server-side and
+// are NEVER in this file. A built-in public default simply means a fresh /
+// incognito browser can connect without any env-var setup.
+//
+// ⚠ If you ROTATE the anon key in Supabase (Settings → API), update the two
+//    FALLBACK_* values below (or set the VITE_ env vars) so the build stays valid.
+const FALLBACK_URL = 'https://qmiqwihgremdfehaiccu.supabase.co';
+const FALLBACK_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtaXF3aWhncmVtZGZlaGFpY2N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMzE3NDksImV4cCI6MjA5NjYwNzc0OX0.iWGSba3xeQOY5-ZPb1K3sWRd4HU5_HI_hKL-KZiIhM0';
+const ENV_URL = import.meta.env.VITE_SUPABASE_URL || FALLBACK_URL;
+const ENV_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || FALLBACK_KEY;
 let client: SupabaseClient | null = null;
 
 export function getSupabaseUrl(): string {
