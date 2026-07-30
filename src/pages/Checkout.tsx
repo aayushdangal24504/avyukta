@@ -24,6 +24,7 @@ import { useStore } from '../lib/store';
 import { sendOrderEmails } from '../lib/email';
 import { EmptyState, SafeImage, Spinner } from '../components/ui';
 import { RichText } from '../components/RichText';
+import { trackCheckout, trackOrder } from '../lib/analytics';
 
 const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
@@ -107,6 +108,15 @@ export default function Checkout() {
 
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+
+  // Track checkout entry
+  const checkoutTracked = useRef(false);
+  useEffect(() => {
+    if (!checkoutTracked.current) {
+      checkoutTracked.current = true;
+      trackCheckout();
+    }
+  }, []);
 
   /** After the order is placed we set this and show the "I Confirm" interstitial.
    *  Only when `confirmed === true` do we reveal the success page. */
@@ -202,6 +212,9 @@ export default function Checkout() {
       const totalSnapshot = cartTotal;
 
       clearCart();
+
+      // Track order placement
+      trackOrder(order.id, order.total);
 
       setPending({
         id: order.id,

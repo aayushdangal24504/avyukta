@@ -1,16 +1,19 @@
 /** Shop page: category filter, price/newest sort, search, pagination, quick view. */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getCategoriesSorted, getVisibleProducts } from '../lib/db';
 import { useStore } from '../lib/store';
 import { EmptyState, Reveal, SkeletonCard } from '../components/ui';
 import { ProductCard } from '../components/ProductCard';
+import { trackSearch, trackCategoryClick } from '../lib/analytics';
 
 const PER_PAGE = 8;
 
 export default function Shop() {
   useStore();
   const [params, setParams] = useSearchParams();
+  const prevCat = useRef(Number(params.get('cat')) || 0);
+  const prevQ = useRef(params.get('q') || '');
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<'newest' | 'low' | 'high'>('newest');
@@ -21,6 +24,25 @@ export default function Shop() {
     const t = setTimeout(() => setLoading(false), 600);
     return () => clearTimeout(t);
   }, []);
+
+  // Track category changes
+  useEffect(() => {
+    if (cat && cat !== prevCat.current) {
+      const cats = getCategoriesSorted();
+      const catName = cats.find((c) => c.id === cat)?.name;
+      trackCategoryClick(cat, catName);
+    }
+    prevCat.current = cat;
+  }, [cat]);
+
+  // Track search queries
+  useEffect(() => {
+    if (q.trim() && q !== prevQ.current) {
+      trackSearch(q.trim());
+    }
+    prevQ.current = q;
+  }, [q]);
+
   useEffect(() => setPage(1), [cat, sort, q]);
 
   const cats = getCategoriesSorted();

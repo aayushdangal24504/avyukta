@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { StoreProvider } from './lib/store';
 import { Navbar, Footer, CartDrawer } from './components/layout';
 import { Petals, ToastStack, EmptyState } from './components/ui';
+import { startAnalyticsSync, trackPage } from './lib/analytics';
 import Home from './pages/Home';
 import Shop from './pages/Shop';
 import ProductDetail from './pages/ProductDetail';
@@ -17,11 +18,14 @@ import AdminProducts from './admin/Products';
 import AdminCategories from './admin/Categories';
 import AdminOrders from './admin/Orders';
 import AdminSettings from './admin/Settings';
+import AdminAnalytics from './admin/Analytics';
 
 /** Storefront shell: navbar, petals, cart drawer, footer. Scrolls to top on route change. */
 function StoreShell() {
   const loc = useLocation();
   useEffect(() => { window.scrollTo({ top: 0 }); }, [loc.pathname]);
+  // Auto-track page visits for storefront pages
+  useEffect(() => { trackPage(loc.pathname + loc.search); }, [loc.pathname, loc.search]);
   return (
     <div className="flex min-h-screen flex-col">
       <Petals count={12} />
@@ -49,6 +53,11 @@ function NotFound() {
 }
 
 export default function App() {
+  // Start analytics sync on app mount
+  useEffect(() => {
+    startAnalyticsSync();
+  }, []);
+
   return (
     <StoreProvider>
       <HashRouter>
@@ -70,6 +79,7 @@ export default function App() {
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Dashboard />} />
+            <Route path="analytics" element={<AdminAnalytics />} />
             <Route path="products" element={<AdminProducts />} />
             <Route path="categories" element={<AdminCategories />} />
             <Route path="orders" element={<AdminOrders />} />

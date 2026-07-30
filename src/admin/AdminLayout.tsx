@@ -6,6 +6,7 @@ import { getDB } from '../lib/db';
 
 const NAV = [
   { to: '/admin', label: 'Dashboard', icon: '📊', end: true },
+  { to: '/admin/analytics', label: 'Analytics', icon: '📈', end: false },
   { to: '/admin/products', label: 'Products', icon: '🎁' },
   { to: '/admin/categories', label: 'Categories', icon: '🗂️' },
   { to: '/admin/orders', label: 'Orders', icon: '📦' },

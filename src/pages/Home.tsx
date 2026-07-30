@@ -10,6 +10,7 @@ import { RichText } from '../components/RichText';
 import { ProductShowcase3D } from '../components/ProductShowcase3D';
 import { Scroll3DHero } from '../components/Scroll3DHero';
 import { ProductCard } from '../components/ProductCard';
+import { trackCTA } from '../lib/analytics';
 
 function parseTestimonials(): { name: string; text: string }[] {
   return getSetting('testimonials')
@@ -170,8 +171,8 @@ export default function Home() {
               )}
               {(heroCta || heroCta2) && (
                 <div className="anim-up mt-8 flex flex-wrap gap-4" style={{ animationDelay: '.45s' }}>
-                  {heroCta && <Link to="/shop" className="btn-grad rounded-full px-8 py-3.5 text-sm font-semibold tracking-wide">{heroCta}</Link>}
-                  {heroCta2 && <button onClick={scrollToCategories} className="btn-ghost rounded-full px-8 py-3.5 text-sm font-semibold">{heroCta2}</button>}
+                  {heroCta && <Link to="/shop" onClick={() => trackCTA(heroCta)} className="btn-grad rounded-full px-8 py-3.5 text-sm font-semibold tracking-wide">{heroCta}</Link>}
+                  {heroCta2 && <button onClick={() => { trackCTA(heroCta2); scrollToCategories(); }} className="btn-ghost rounded-full px-8 py-3.5 text-sm font-semibold">{heroCta2}</button>}
                 </div>
               )}
               {stats.length > 0 && (

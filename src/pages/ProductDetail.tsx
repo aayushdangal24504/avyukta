@@ -1,10 +1,11 @@
 /** Product detail: gallery, qty selector, fly-to-cart, related products. */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getDB, getVisibleProducts, money } from '../lib/db';
 import { useStore, flyToCart } from '../lib/store';
 import { EmptyState, Reveal, SafeImage } from '../components/ui';
 import { ProductCard } from '../components/ProductCard';
+import { trackProductView, trackAddToCart, trackBuyNow } from '../lib/analytics';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -16,6 +17,16 @@ export default function ProductDetail() {
 
   const db = getDB();
   const product = db.products.find((p) => p.id === Number(id) && p.is_visible);
+
+  // Track product view
+  const trackedRef = useRef(false);
+  useEffect(() => {
+    if (product && !trackedRef.current) {
+      trackedRef.current = true;
+      trackProductView(product.id);
+    }
+    return () => { trackedRef.current = false; };
+  }, [product?.id]);
 
   if (!product) {
     return (
@@ -38,6 +49,7 @@ export default function ProductDetail() {
     if (product.stock <= 0) return toast('Sorry, this item is out of stock.', 'error');
     flyToCart(imgRef.current);
     addToCart(product.id, qty);
+    trackAddToCart(product.id, product.name);
     toast(`${product.name} added to cart 🌸`);
   };
 
@@ -101,7 +113,7 @@ export default function ProductDetail() {
               Add to Cart 🛍️
             </button>
             <button
-              onClick={() => { if (product.stock <= 0) return; addToCart(product.id, qty); nav('/checkout'); }}
+              onClick={() => { if (product.stock <= 0) return; addToCart(product.id, qty); trackBuyNow(product.id); nav('/checkout'); }}
               disabled={product.stock <= 0}
               className="btn-ghost rounded-full px-8 py-3.5 text-sm font-semibold disabled:opacity-50"
             >

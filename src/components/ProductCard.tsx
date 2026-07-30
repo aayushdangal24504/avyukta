@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Product, money } from '../lib/db';
 import { useStore, flyToCart } from '../lib/store';
 import { SafeImage, Tilt } from './ui';
+import { trackAddToCart, trackBuyNow, trackQuickView } from '../lib/analytics';
 
 export function ProductCard({ product }: { product: Product }) {
   const { addToCart, toast, setCartOpen } = useStore();
@@ -18,6 +19,7 @@ export function ProductCard({ product }: { product: Product }) {
     if (product.stock <= 0) return toast('Sorry, this item is out of stock.', 'error');
     flyToCart(imgRef.current);
     addToCart(product.id);
+    trackAddToCart(product.id, product.name);
     toast(`${product.name} added to cart 🌸`);
   };
 
@@ -25,6 +27,7 @@ export function ProductCard({ product }: { product: Product }) {
     e.stopPropagation();
     if (product.stock <= 0) return toast('Sorry, this item is out of stock.', 'error');
     addToCart(product.id);
+    trackBuyNow(product.id);
     nav('/checkout');
   };
 
@@ -61,7 +64,7 @@ export function ProductCard({ product }: { product: Product }) {
               <span className="absolute right-3 top-3 rounded-full bg-amber-400/95 px-3 py-1 text-[10px] font-bold text-amber-900">Only {product.stock} left</span>
             ) : null}
             <button
-              onClick={(e) => { e.stopPropagation(); setQuick(true); }}
+              onClick={(e) => { e.stopPropagation(); setQuick(true); trackQuickView(product.id); }}
               className="absolute bottom-3 right-3 translate-y-12 rounded-full bg-white/95 px-4 py-2 text-xs font-semibold text-[#7f4c5a] opacity-0 shadow-lg transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100"
             >
               Quick view ✨
@@ -121,6 +124,7 @@ function QuickQty({ product, onDone }: { product: Product; onDone: () => void })
           onClick={() => {
             if (product.stock <= 0) return toast('Out of stock', 'error');
             addToCart(product.id, qty);
+            trackAddToCart(product.id, product.name);
             toast(`${product.name} added to cart 🌸`);
             onDone();
           }}
