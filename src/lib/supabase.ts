@@ -154,6 +154,29 @@ export function setSnapshot(db: DBShape) {
   snapshot = JSON.parse(JSON.stringify(db)) as DBShape;
 }
 
+/**
+ * Record one product as successfully written without treating unrelated local
+ * edits as synced. Used by the admin flag controls, which save immediately.
+ */
+export function markProductSynced(product: Product) {
+  if (!snapshot) return;
+  const index = snapshot.products.findIndex((row) => row.id === product.id);
+  if (index >= 0) snapshot.products[index] = JSON.parse(JSON.stringify(product)) as Product;
+}
+
+/** Save product placement flags immediately, rather than relying on the
+ * background sync timer. This makes Featured, New Arrival and Best Seller
+ * survive a refresh as soon as the control is clicked. */
+export async function updateProductFlags(
+  id: number,
+  flags: Pick<Product, 'is_featured' | 'is_new' | 'is_best'>
+): Promise<void> {
+  const sb = getClient();
+  if (!sb) throw new Error('Cloud database is not configured.');
+  const { error } = await sb.from('products').update(flags).eq('id', id);
+  if (error) throw new Error(`products: ${error.message}`);
+}
+
 /* --------------------------------- PUSH ---------------------------------- */
 /**
  * Upsert ALL local rows. NEVER deletes anything in the cloud — used only for

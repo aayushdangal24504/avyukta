@@ -156,15 +156,15 @@ export function getDB(): DBShape {
   return cache;
 }
 
-/** Save the local cache AND schedule a cloud diff-push. */
-export function saveDB() {
+/** Save the local cache and, unless disabled, schedule a cloud diff-push. */
+export function saveDB(scheduleCloudPush = true) {
   if (!cache) return;
   try {
     localStorage.setItem(DB_KEY, JSON.stringify(cache));
   } catch {
     console.warn('AVYUKTA: storage quota exceeded; data kept in memory only.');
   }
-  schedulePush(cache);
+  if (scheduleCloudPush) schedulePush(cache);
   window.dispatchEvent(new CustomEvent('avyukta-db-change'));
 }
 

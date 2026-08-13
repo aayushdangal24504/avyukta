@@ -6,6 +6,7 @@ import { useStore } from '../lib/store';
 import { EmptyState, SafeImage, Spinner } from '../components/ui';
 import { ImageCropper } from '../components/ImageCropper';
 import { uploadProductImage } from '../lib/storage';
+import { markProductSynced, updateProductFlags } from '../lib/supabase';
 
 const emptyForm = { name: '', description: '', price: '', stock: '', category_id: 0, images: [] as string[], imagesDetail: [] as string[], is_featured: false, is_new: false, is_best: false, is_visible: true };
 
@@ -18,6 +19,7 @@ export default function AdminProducts() {
   const [busy, setBusy] = useState(false);
   const [cropQueue, setCropQueue] = useState<File[]>([]); // files waiting in the cropper
   const [uploading, setUploading] = useState(false);
+  const [savingFlags, setSavingFlags] = useState<number[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const products = [...db.products].sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -100,16 +102,40 @@ export default function AdminProducts() {
     setEditing(null);
   };
 
-  const toggle = (p: Product, key: 'is_visible' | 'is_featured' | 'is_new' | 'is_best') => {
-    p[key] = !p[key];
-    saveDB();
-    const msgs: Record<typeof key, string> = {
-      is_visible: p.is_visible ? 'Product is now visible in store' : 'Product hidden from store',
-      is_featured: p.is_featured ? 'Marked as featured ★' : 'Removed from featured',
-      is_new: p.is_new ? 'Marked as New Arrival 🌷' : 'Removed from New Arrivals',
-      is_best: p.is_best ? 'Marked as Best Seller 💖' : 'Removed from Best Sellers',
-    };
-    toast(msgs[key]);
+  const toggle = async (p: Product, key: 'is_visible' | 'is_featured' | 'is_new' | 'is_best') => {
+    if (savingFlags.includes(p.id)) return;
+    const previous = p[key];
+    p[key] = !previous;
+    // Flag placement is an important storefront setting: write it now, not on
+    // the debounced background timer that can be lost on a refresh.
+    saveDB(false);
+    setSavingFlags((ids) => [...ids, p.id]);
+    try {
+      if (key === 'is_visible') {
+        // Keep visibility on the normal full product sync path.
+        saveDB();
+      } else {
+        await updateProductFlags(p.id, {
+          is_featured: p.is_featured,
+          is_new: p.is_new,
+          is_best: p.is_best,
+        });
+        markProductSynced(p);
+      }
+      const msgs: Record<typeof key, string> = {
+        is_visible: p.is_visible ? 'Product is now visible in store' : 'Product hidden from store',
+        is_featured: p.is_featured ? 'Featured setting saved ★' : 'Removed from featured',
+        is_new: p.is_new ? 'New Arrival setting saved 🌷' : 'Removed from New Arrivals',
+        is_best: p.is_best ? 'Best Seller setting saved 💖' : 'Removed from Best Sellers',
+      };
+      toast(msgs[key]);
+    } catch (error) {
+      p[key] = previous;
+      saveDB(false);
+      toast(`Could not save this setting: ${(error as Error).message}`, 'error');
+    } finally {
+      setSavingFlags((ids) => ids.filter((id) => id !== p.id));
+    }
   };
 
   const doDelete = () => {
@@ -167,13 +193,13 @@ export default function AdminProducts() {
                     </td>
                     <td className="px-5 py-3"><Toggle on={p.is_visible} onClick={() => toggle(p, 'is_visible')} /></td>
                     <td className="px-5 py-3">
-                      <button onClick={() => toggle(p, 'is_featured')} className={`text-xl transition active:scale-75 ${p.is_featured ? 'text-amber-400' : 'text-rose-200 hover:text-amber-300'}`} title="Toggle featured">★</button>
+                      <button disabled={savingFlags.includes(p.id)} onClick={() => toggle(p, 'is_featured')} className={`text-xl transition active:scale-75 ${p.is_featured ? 'text-amber-400' : 'text-rose-200 hover:text-amber-300'}`} title="Toggle featured">★</button>
                     </td>
                     <td className="px-5 py-3">
-                      <button onClick={() => toggle(p, 'is_new')} className={`text-xl transition active:scale-75 ${p.is_new ? '' : 'opacity-25 grayscale hover:opacity-60'}`} title="Toggle new arrival">🌷</button>
+                      <button disabled={savingFlags.includes(p.id)} onClick={() => toggle(p, 'is_new')} className={`text-xl transition active:scale-75 ${p.is_new ? '' : 'opacity-25 grayscale hover:opacity-60'}`} title="Toggle new arrival">🌷</button>
                     </td>
                     <td className="px-5 py-3">
-                      <button onClick={() => toggle(p, 'is_best')} className={`text-xl transition active:scale-75 ${p.is_best ? '' : 'opacity-25 grayscale hover:opacity-60'}`} title="Toggle best seller">💖</button>
+                      <button disabled={savingFlags.includes(p.id)} onClick={() => toggle(p, 'is_best')} className={`text-xl transition active:scale-75 ${p.is_best ? '' : 'opacity-25 grayscale hover:opacity-60'}`} title="Toggle best seller">💖</button>
                     </td>
                     <td className="px-5 py-3 text-right">
                       <button onClick={() => openEdit(p)} className="rounded-full bg-rose-50 px-4 py-1.5 text-xs font-semibold text-[#7f4c5a] transition hover:bg-rose-100">Edit</button>

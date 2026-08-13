@@ -118,3 +118,10 @@ create policy "products delete" on storage.objects for delete using (bucket_id =
 -- The first time you open Admin → Login the app asks you to
 -- create the initial admin user from the UI.
 -- ============================================================
+
+-- Safe upgrade for installations created before storefront placement flags
+-- existed. These columns are required for Featured, New Arrival and Best
+-- Seller changes made in Admin → Products to persist.
+alter table products add column if not exists is_featured boolean not null default false;
+alter table products add column if not exists is_new boolean not null default false;
+alter table products add column if not exists is_best boolean not null default false;
