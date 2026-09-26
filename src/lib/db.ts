@@ -1,4 +1,5 @@
 import { schedulePush } from './supabase';
+import { roundMoney } from './cart';
 
 /**
  * AVYUKTA — client-side database layer.
@@ -39,7 +40,45 @@ export interface Product {
   is_visible: boolean;
   created_at: string;
 }
-export type OrderStatus = 'Pending' | 'Confirmed' | 'Shipped' | 'Delivered' | 'Cancelled';
+export type OrderStatus =
+  | 'Pending'
+  | 'Confirmed'
+  | 'Confirmed and being prepared'
+  | 'Shipped'
+  | 'Shipped(on the way)'
+  | 'Delivered'
+  | 'Cancelled';
+
+/** Canonical status → the colour/label helpers in ui.tsx key off these. */
+export const ORDER_STATUSES: OrderStatus[] = [
+  'Pending',
+  'Confirmed',
+  'Confirmed and being prepared',
+  'Shipped',
+  'Shipped(on the way)',
+  'Delivered',
+  'Cancelled',
+];
+
+/** Collapse a display status onto the colour family it belongs to. */
+export function statusFamily(status: string): 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled' {
+  if (status === 'Cancelled') return 'cancelled';
+  if (status.startsWith('Delivered')) return 'delivered';
+  if (status.startsWith('Shipped')) return 'shipped';
+  if (status.startsWith('Confirmed')) return 'confirmed';
+  return 'pending';
+}
+
+/** Tailwind classes per status family — one source of truth for every badge. */
+export const STATUS_STYLES: Record<ReturnType<typeof statusFamily>, string> = {
+  pending: 'bg-amber-100 text-amber-700 ring-amber-300',
+  confirmed: 'bg-blue-100 text-blue-700 ring-blue-300',
+  shipped: 'bg-purple-100 text-purple-700 ring-purple-300',
+  delivered: 'bg-emerald-100 text-emerald-700 ring-emerald-300',
+  cancelled: 'bg-red-100 text-red-700 ring-red-300',
+};
+
+export const statusStyle = (status: string) => STATUS_STYLES[statusFamily(status)];
 export interface OrderItem {
   id: number;
   order_id: number;
@@ -113,6 +152,94 @@ function emptyDB(): DBShape {
 /* ------------------------------ persistence ------------------------------ */
 let cache: DBShape | null = null;
 
+/** Coerce a JSON/Postgres value into a real number (numeric cols arrive as
+ *  strings; without this `price.toFixed()` throws and the site white-screens). */
+function num(v: unknown, fallback = 0): number {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function toInt(v: unknown, fallback = 0): number {
+  return Math.trunc(num(v, fallback));
+}
+
+const str = (v: unknown, fallback = ''): string =>
+  typeof v === 'string' ? v : v === null || v === undefined ? fallback : String(v);
+
+/** Repair one product row: numbers are numbers, images are arrays. */
+function normalizeProduct(p: Product): Product {
+  const images = Array.isArray(p.images) ? p.images.filter((s) => typeof s === 'string' && s) : [];
+  const detail = Array.isArray(p.images_detail) ? p.images_detail.filter((s) => typeof s === 'string' && s) : [];
+  return {
+    ...p,
+    id: toInt(p.id),
+    name: str(p.name),
+    description: str(p.description),
+    price: Math.max(0, num(p.price)),
+    stock: Math.max(0, toInt(p.stock)),
+    category_id: toInt(p.category_id),
+    images,
+    images_detail: detail.length ? detail : [...images],
+    is_featured: !!p.is_featured,
+    is_new: !!p.is_new,
+    is_best: !!p.is_best,
+    is_visible: !!p.is_visible,
+    created_at: str(p.created_at, new Date(0).toISOString()),
+  };
+}
+
+/** Same treatment for every table — cheap insurance against a bad row. */
+function normalizeShape(shape: Partial<DBShape> | null | undefined): DBShape {
+  const s = (shape || {}) as Partial<DBShape>;
+  const settings: Record<string, string> = {};
+  if (s.settings && typeof s.settings === 'object') {
+    for (const [k, v] of Object.entries(s.settings)) settings[k] = str(v);
+  }
+  return {
+    users: (Array.isArray(s.users) ? s.users : []).map((u) => ({
+      ...u,
+      id: toInt(u.id),
+      username: str(u.username),
+      password_hash: str(u.password_hash),
+      role: u.role === 'admin' ? 'admin' : 'customer',
+      created_at: str(u.created_at, new Date(0).toISOString()),
+    })),
+    categories: (Array.isArray(s.categories) ? s.categories : []).map((c) => ({
+      ...c,
+      id: toInt(c.id),
+      name: str(c.name),
+      image: str(c.image),
+      sort_order: toInt(c.sort_order),
+    })),
+    products: (Array.isArray(s.products) ? s.products : []).map(normalizeProduct),
+    orders: (Array.isArray(s.orders) ? s.orders : []).map((o) => ({
+      ...o,
+      id: toInt(o.id),
+      customer_name: str(o.customer_name),
+      phone: str(o.phone),
+      email: str(o.email),
+      location: str(o.location),
+      notes: str(o.notes),
+      total: Math.max(0, num(o.total)),
+      status: str(o.status, 'Pending') as OrderStatus,
+      user_id: o.user_id === null || o.user_id === undefined ? null : toInt(o.user_id),
+      tracking_code: str(o.tracking_code),
+      created_at: str(o.created_at, new Date(0).toISOString()),
+    })),
+    order_items: (Array.isArray(s.order_items) ? s.order_items : []).map((i) => ({
+      ...i,
+      id: toInt(i.id),
+      order_id: toInt(i.order_id),
+      product_id: toInt(i.product_id),
+      product_name: str(i.product_name),
+      price: Math.max(0, num(i.price)),
+      quantity: Math.max(0, toInt(i.quantity)),
+    })),
+    settings,
+    seq: (s.seq && typeof s.seq === 'object' ? s.seq : {}) as DBShape['seq'],
+  };
+}
+
 /**
  * One-time migration: if the browser still holds a pre-cleanup cache
  * (which contained demo products/categories/settings), wipe it.
@@ -136,20 +263,15 @@ export function getDB(): DBShape {
   try {
     const raw = localStorage.getItem(DB_KEY);
     if (raw) {
-      cache = JSON.parse(raw) as DBShape;
-      // backfill new fields on older rows
-      cache.products.forEach((p) => {
-        if (typeof p.is_new !== 'boolean') p.is_new = false;
-        if (typeof p.is_best !== 'boolean') p.is_best = false;
-        if (!Array.isArray(p.images_detail)) p.images_detail = Array.isArray(p.images) ? [...p.images] : [];
-        if (!Array.isArray(p.images)) p.images = [];
-      });
+      // normalizeShape repairs rows written by older builds (missing columns,
+      // string prices, non-array images) instead of trusting them blindly.
+      cache = normalizeShape(JSON.parse(raw) as DBShape);
       return cache;
     }
   } catch {
     /* corrupted — start empty (we never re-seed) */
   }
-  cache = emptyDB();
+  cache = normalizeShape(emptyDB());
   // Persist the empty shell so the app has a stable cache slot, but do NOT push
   // it to Supabase — we never want to overwrite cloud data with an empty shell.
   try { localStorage.setItem(DB_KEY, JSON.stringify(cache)); } catch { /* quota */ }
@@ -170,7 +292,7 @@ export function saveDB(scheduleCloudPush = true) {
 
 /** Replace the whole in-memory db (used only when hydrating from Supabase). */
 export function replaceCache(shape: DBShape) {
-  cache = shape;
+  cache = normalizeShape(shape);
   try { localStorage.setItem(DB_KEY, JSON.stringify(cache)); } catch { /* quota */ }
   window.dispatchEvent(new CustomEvent('avyukta-db-change'));
 }
@@ -188,7 +310,7 @@ export function reloadFromStorage() {
   try {
     const raw = localStorage.getItem(DB_KEY);
     if (raw) {
-      cache = JSON.parse(raw) as DBShape;
+      cache = normalizeShape(JSON.parse(raw) as DBShape);
       window.dispatchEvent(new CustomEvent('avyukta-db-change'));
     }
   } catch { /* keep current cache */ }
@@ -197,7 +319,15 @@ export function reloadFromStorage() {
 /* -------------------------------- helpers -------------------------------- */
 export const sanitize = (s: string) => s.replace(/[<>]/g, '').trim();
 export const validPhone = (p: string) => /^\d{7,15}$/.test(p.replace(/[\s()+-]/g, ''));
-export const money = (n: number) => 'Rs. ' + n.toFixed(2);
+
+/**
+ * Format money. Tolerates anything — a string price from Postgres, undefined,
+ * NaN — because a price must NEVER be able to crash a render.
+ */
+export const money = (n: unknown) => 'Rs. ' + roundMoney(num(n)).toFixed(2);
+
+/** How many units of a product a customer may still add to their cart. */
+export const sellableStock = (p: Product) => (p.is_visible ? Math.max(0, toInt(p.stock)) : 0);
 
 export function getVisibleProducts(): Product[] {
   return getDB().products.filter((p) => p.is_visible);
@@ -243,21 +373,65 @@ export function getOrderByTrackingCode(code: string): Order | null {
   return getDB().orders.find((o) => o.tracking_code === code) || null;
 }
 
-/** Create an order + its items, decrement stock. Returns the new order. */
+export interface OrderDraftItem {
+  product_id: number;
+  quantity: number;
+}
+
+export class OrderError extends Error {}
+
+/**
+ * Create an order + its items, decrementing stock.
+ *
+ * Everything is re-validated here against the CURRENT catalog rather than
+ * trusting the cart that was rendered a moment ago, so the total stored on the
+ * order is guaranteed to equal the sum of its line items.
+ */
 export function createOrder(
   data: { customer_name: string; phone: string; email: string; location: string; notes: string; user_id: number | null },
-  items: { product_id: number; quantity: number }[]
+  items: OrderDraftItem[]
 ): Order {
   const db = getDB();
-  let total = 0;
-  const resolved = items
-    .map((it) => {
-      const p = db.products.find((pr) => pr.id === it.product_id);
-      if (!p) return null;
-      total += p.price * it.quantity;
-      return { p, qty: it.quantity };
-    })
-    .filter(Boolean) as { p: Product; qty: number }[];
+
+  // Merge duplicate product lines, drop unusable ones.
+  const wanted = new Map<number, number>();
+  for (const raw of Array.isArray(items) ? items : []) {
+    const id = toInt(raw?.product_id);
+    const qty = Math.round(num(raw?.quantity));
+    if (id <= 0 || qty <= 0) continue;
+    wanted.set(id, (wanted.get(id) ?? 0) + qty);
+  }
+
+  const resolved: { p: Product; qty: number }[] = [];
+  for (const [id, requested] of wanted) {
+    const p = db.products.find((pr) => pr.id === id);
+    if (!p) continue; // product vanished between checkout render and submit
+    const available = sellableStock(p);
+    const qty = Math.min(requested, available);
+    if (qty <= 0) continue;
+    resolved.push({ p, qty });
+  }
+
+  if (resolved.length === 0) {
+    throw new OrderError('None of the items in your cart are available any more.');
+  }
+  const short = resolved.find(({ p, qty }) => qty < (wanted.get(p.id) ?? 0));
+  if (short) {
+    throw new OrderError(
+      `Only ${short.qty} × ${short.p.name} left in stock. Please update your cart.`
+    );
+  }
+
+  // Price snapshot + total come from the SAME resolved lines, so they can
+  // never disagree with each other.
+  const lines = resolved.map(({ p, qty }) => ({
+    id: nextId('order_items'),
+    product_id: p.id,
+    product_name: p.name,
+    price: roundMoney(p.price),
+    quantity: qty,
+  }));
+  const total = roundMoney(lines.reduce((s, l) => s + l.price * l.quantity, 0));
 
   const id = nextId('orders');
   const order: Order = {
@@ -267,17 +441,19 @@ export function createOrder(
     email: sanitize(data.email),
     location: sanitize(data.location),
     notes: sanitize(data.notes),
-    total: Math.round(total * 100) / 100,
+    total,
     status: 'Pending',
     created_at: new Date().toISOString(),
     user_id: data.user_id,
     tracking_code: generateTrackingCode(),
   };
+
   db.orders.push(order);
-  resolved.forEach(({ p, qty }) => {
-    db.order_items.push({ id: nextId('order_items'), order_id: id, product_id: p.id, product_name: p.name, price: p.price, quantity: qty });
-    p.stock = Math.max(0, p.stock - qty);
-  });
+  for (const l of lines) {
+    db.order_items.push({ ...l, order_id: id });
+    const p = resolved.find((r) => r.p.id === l.product_id)!.p;
+    p.stock = Math.max(0, p.stock - l.quantity);
+  }
   saveDB();
   return order;
 }

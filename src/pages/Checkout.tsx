@@ -19,6 +19,7 @@ import {
   getSetting,
   money,
   validPhone,
+  OrderError,
 } from '../lib/db';
 import { useStore } from '../lib/store';
 import { sendOrderEmails } from '../lib/email';
@@ -93,7 +94,7 @@ function Stepper({ current }: { current: 1 | 2 | 3 }) {
 
 /* --------------------------------- checkout ------------------------------- */
 export default function Checkout() {
-  const { cartProducts, cartTotal, clearCart, session, toast, setQty } = useStore();
+  const { cartProducts, cartTotal, cartCount, clearCart, session, toast, setQty } = useStore();
   const nav = useNavigate();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -232,7 +233,12 @@ export default function Checkout() {
       });
       setConfirmed(false);
     } catch (e) {
-      toast(`Could not place order: ${(e as Error).message}`, 'error');
+      // Stock may have changed between rendering the summary and submitting.
+      // OrderError carries a customer-safe message; anything else is a bug.
+      toast(
+        e instanceof OrderError ? e.message : `Could not place order: ${(e as Error).message}`,
+        'error'
+      );
     } finally {
       setBusy(false);
     }
@@ -434,7 +440,7 @@ export default function Checkout() {
               <div className="rounded-2xl bg-rose-50/60 p-4 ring-1 ring-rose-100 sm:p-5">
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-[#7f4c5a]">
-                    Items ({cartProducts.length})
+                    Items ({cartCount} item{cartCount === 1 ? '' : 's'})
                   </p>
                   <button
                     onClick={() => setStep(1)}
@@ -444,7 +450,7 @@ export default function Checkout() {
                   </button>
                 </div>
                 <ul className="mt-3 divide-y divide-white/60">
-                  {cartProducts.map(({ product, quantity }) => (
+                  {cartProducts.map(({ product, quantity, lineTotal }) => (
                     <li key={product.id} className="flex items-center gap-3 py-2.5">
                       <SafeImage
                         src={product.images?.[0]}
@@ -458,8 +464,8 @@ export default function Checkout() {
                         </p>
                         <p className="text-xs text-[#a98993]">× {quantity}</p>
                       </div>
-                      <span className="text-sm font-semibold text-[#5d4954]">
-                        {money(product.price * quantity)}
+                      <span className="text-sm font-semibold tabular-nums text-[#5d4954]">
+                        {money(lineTotal)}
                       </span>
                     </li>
                   ))}
@@ -479,8 +485,7 @@ export default function Checkout() {
                       About payment
                     </p>
                     <p className="text-xs text-[#a98993]">
-                      **Payment details will be discussed via message or call after we review and confirm your order.**
-
+                      <RichText text="==Payment details== will be discussed via message or call after we review and confirm your order." />
                     </p>
                   </div>
                 </div>
@@ -509,7 +514,7 @@ export default function Checkout() {
 
               <div className="rounded-2xl bg-rose-50/60 p-5 ring-1 ring-rose-100">
                 <p className="text-sm leading-relaxed text-[#6b5560]">
-                 **No payment is required at this time. We will review and confirm your order first, then contact you by message or phone call with the payment details.**
+                  <RichText text="==No payment is required at this time.== We will review and confirm your order first, then contact you by message or call with the payment details." />
 
                 </p>
               </div>
@@ -525,7 +530,7 @@ export default function Checkout() {
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="grid h-5 w-5 place-items-center rounded-full bg-gradient-to-br from-[#b56576] to-[#d291bc] text-[10px] text-white">✓</span>
-                 You will recieve Message or call about confirmation &amp; tracking code
+                 You will receive a message or call about confirmation &amp; tracking code
                 </li>
               </ul>
 
@@ -559,7 +564,7 @@ export default function Checkout() {
         <aside className="anim-up h-fit rounded-3xl bg-gradient-to-br from-[#7f4c5a] to-[#b56576] p-5 text-white shadow-xl sm:p-7 lg:sticky lg:top-24 lg:col-span-2">
           <h2 className="font-display text-lg font-bold">Order Summary</h2>
           <ul className="mt-5 space-y-4">
-  {cartProducts.map(({ product, quantity }) => (
+  {cartProducts.map(({ product, quantity, remaining, lineTotal }) => (
     <li key={product.id} className="flex items-center gap-3">
       <SafeImage
         src={product.images?.[0]}
@@ -582,23 +587,23 @@ export default function Checkout() {
           >
             −
           </button>
-          <span className="min-w-5 text-center text-xs font-semibold">
+          <span className="min-w-5 text-center text-xs font-semibold tabular-nums">
             {quantity}
           </span>
           <button
             type="button"
-            onClick={() =>
-              setQty(product.id, Math.min(quantity + 1, product.stock || 99))
-            }
-            className="grid h-6 w-6 place-items-center rounded-full bg-white/90 text-sm font-bold text-[#7f4c5a] transition active:scale-90 hover:bg-white"
+            onClick={() => setQty(product.id, quantity + 1)}
+            disabled={remaining <= 0}
+            title={remaining <= 0 ? `Only ${quantity} left in stock` : undefined}
+            className="grid h-6 w-6 place-items-center rounded-full bg-white/90 text-sm font-bold text-[#7f4c5a] transition active:scale-90 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
             aria-label={`Increase ${product.name}`}
           >
             +
           </button>
         </div>
       </div>
-      <span className="text-sm font-semibold">
-        {money(product.price * quantity)}
+      <span className="text-sm font-semibold tabular-nums">
+        {money(lineTotal)}
       </span>
     </li>
   ))}
@@ -740,6 +745,8 @@ function SuccessPage({
   checkoutPayment: string;
 }) {
   const trackUrl = `#/track/${order.trackingCode}`;
+  // Count UNITS, not lines: an order for 2 x one product is "2 items".
+  const orderUnitCount = order.items.reduce((n, it) => n + it.quantity, 0);
 
   return (
     <div className="page-enter mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-10">
@@ -809,7 +816,7 @@ function SuccessPage({
                 Your order
               </p>
               <span className="text-[10px] font-semibold text-rose-300">
-                {order.items.length} item{order.items.length > 1 ? 's' : ''}
+                {orderUnitCount} item{orderUnitCount === 1 ? '' : 's'}
               </span>
             </div>
             <ul className="mt-2 divide-y divide-rose-50">

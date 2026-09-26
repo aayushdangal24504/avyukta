@@ -14,19 +14,29 @@ export function ProductCard({ product }: { product: Product }) {
 
   const cover = product.images?.[0] || '';
 
+  /** Shared by "Add to Cart" and "Buy Now" so both honour stock identically. */
+  const addOne = (): number => {
+    if (product.stock <= 0) {
+      toast('Sorry, this item is out of stock.', 'error');
+      return 0;
+    }
+    const added = addToCart(product.id, 1);
+    if (added === 0) toast(`All available stock of ${product.name} is already in your cart.`, 'error');
+    return added;
+  };
+
   const add = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (product.stock <= 0) return toast('Sorry, this item is out of stock.', 'error');
+    if (addOne() === 0) return;
     flyToCart(imgRef.current);
-    addToCart(product.id);
     trackAddToCart(product.id, product.name);
     toast(`${product.name} added to cart 🌸`);
   };
 
   const buyNow = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (product.stock <= 0) return toast('Sorry, this item is out of stock.', 'error');
-    addToCart(product.id);
+    if (addOne() === 0) return;
     trackBuyNow(product.id);
     nav('/checkout');
   };
@@ -112,28 +122,46 @@ export function ProductCard({ product }: { product: Product }) {
 function QuickQty({ product, onDone }: { product: Product; onDone: () => void }) {
   const [qty, setQty] = useState(1);
   const { addToCart, toast } = useStore();
+  const max = Math.max(1, product.stock || 0);
   return (
     <div className="mt-auto pt-5">
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 rounded-full bg-rose-50 px-2 py-1.5">
-          <button onClick={() => setQty(Math.max(1, qty - 1))} className="grid h-7 w-7 place-items-center rounded-full bg-white text-sm font-bold text-[#7f4c5a] shadow-sm active:scale-90">−</button>
-          <span className="w-7 text-center text-sm font-semibold">{qty}</span>
-          <button onClick={() => setQty(Math.min(product.stock || 99, qty + 1))} className="grid h-7 w-7 place-items-center rounded-full bg-white text-sm font-bold text-[#7f4c5a] shadow-sm active:scale-90">+</button>
+          <button
+            onClick={() => setQty((q) => Math.max(1, q - 1))}
+            disabled={qty <= 1}
+            aria-label="Decrease quantity"
+            className="grid h-7 w-7 place-items-center rounded-full bg-white text-sm font-bold text-[#7f4c5a] shadow-sm active:scale-90 disabled:opacity-40"
+          >−</button>
+          <span className="w-7 text-center text-sm font-semibold tabular-nums">{qty}</span>
+          <button
+            onClick={() => setQty((q) => Math.min(max, q + 1))}
+            disabled={qty >= max}
+            aria-label="Increase quantity"
+            className="grid h-7 w-7 place-items-center rounded-full bg-white text-sm font-bold text-[#7f4c5a] shadow-sm active:scale-90 disabled:opacity-40"
+          >+</button>
         </div>
         <button
           onClick={() => {
             if (product.stock <= 0) return toast('Out of stock', 'error');
-            addToCart(product.id, qty);
+            const added = addToCart(product.id, qty);
             trackAddToCart(product.id, product.name);
-            toast(`${product.name} added to cart 🌸`);
+            if (added < qty) {
+              toast(`Only ${added} more added — that's all the stock we have.`, 'error');
+            } else {
+              toast(`${product.name} added to cart 🌸`);
+            }
             onDone();
           }}
-          className="btn-grad flex-1 rounded-full py-2.5 text-sm font-semibold"
+          disabled={product.stock <= 0}
+          className="btn-grad flex-1 rounded-full py-2.5 text-sm font-semibold disabled:opacity-50"
         >
           Add to Cart
         </button>
       </div>
-      <p className="mt-2 text-xs text-[#a98993]">{product.stock > 0 ? `${product.stock} in stock · handmade to order` : 'Currently out of stock'}</p>
+      <p className="mt-2 text-xs text-[#a98993]">
+        {product.stock > 0 ? `${product.stock} in stock · handmade to order` : 'Currently out of stock'}
+      </p>
     </div>
   );
 }

@@ -1,10 +1,8 @@
 /** Admin orders: search, status dropdown w/ color badges, details modal, export, delete. */
 import { useState } from 'react';
-import { getDB, saveDB, getOrderItems, money, Order, OrderStatus } from '../lib/db';
+import { getDB, saveDB, getOrderItems, money, statusStyle, Order, OrderStatus, ORDER_STATUSES } from '../lib/db';
 import { useStore } from '../lib/store';
 import { EmptyState, StatusBadge } from '../components/ui';
-
-const STATUSES: OrderStatus[] = ['Pending', 'Confirmed and being prepared', 'Shipped(on the way)', 'Delivered', 'Cancelled'];
 
 export default function AdminOrders() {
   const { toast } = useStore();
@@ -109,11 +107,10 @@ export default function AdminOrders() {
                         <select
                           value={o.status}
                           onChange={(e) => setStatus(o, e.target.value as OrderStatus)}
-                          className={`cursor-pointer rounded-full border-0 px-3 py-1.5 text-xs font-bold outline-none ring-1 ${
-                            { Pending: 'bg-amber-100 text-amber-700 ring-amber-300', Confirmed: 'bg-blue-100 text-blue-700 ring-blue-300', Shipped: 'bg-purple-100 text-purple-700 ring-purple-300', Delivered: 'bg-emerald-100 text-emerald-700 ring-emerald-300', Cancelled: 'bg-red-100 text-red-700 ring-red-300' }[o.status]
-                          }`}
+                          aria-label={`Status for order #${o.id}`}
+                          className={`cursor-pointer rounded-full border-0 px-3 py-1.5 text-xs font-bold outline-none ring-1 ${statusStyle(o.status)}`}
                         >
-                          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                          {ORDER_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                         </select>
                       </td>
                       <td className="px-5 py-3.5 text-right">

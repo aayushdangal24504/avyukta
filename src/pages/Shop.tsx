@@ -10,7 +10,10 @@ import { trackSearch, trackCategoryClick } from '../lib/analytics';
 const PER_PAGE = 8;
 
 export default function Shop() {
-  useStore();
+  // Re-render when the catalog changes (admin edit, cloud sync from another
+  // device). The filtered list below is memoised, so without this bump the grid
+  // could keep showing a stale product list after a sync.
+  const { dbVersion } = useStore();
   const [params, setParams] = useSearchParams();
   const prevCat = useRef(Number(params.get('cat')) || 0);
   const prevQ = useRef(params.get('q') || '');
@@ -43,8 +46,6 @@ export default function Shop() {
     prevQ.current = q;
   }, [q]);
 
-  useEffect(() => setPage(1), [cat, sort, q]);
-
   const cats = getCategoriesSorted();
   const filtered = useMemo(() => {
     let list = getVisibleProducts();
@@ -54,10 +55,13 @@ export default function Shop() {
     else if (sort === 'high') list = [...list].sort((a, b) => b.price - a.price);
     else list = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at));
     return list;
-  }, [cat, sort, q]);
+  }, [cat, sort, q, dbVersion]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-  const visible = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  // Clamp during render rather than in an effect: changing the filter used to
+  // paint one frame of "page 4 of 2" (an empty grid) before setPage(1) landed.
+  const currentPage = Math.min(Math.max(1, page), pages);
+  const visible = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
   return (
     <div className="page-enter mx-auto max-w-7xl px-6 py-10">
@@ -70,7 +74,7 @@ export default function Shop() {
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => setParams({})}
+            onClick={() => { setPage(1); setParams({}); }}
             className={`rounded-full px-4 py-2 text-xs font-semibold transition-all ${!cat ? 'btn-grad' : 'bg-white text-[#7f4c5a] ring-1 ring-rose-200 hover:bg-rose-50'}`}
           >
             All
@@ -78,7 +82,7 @@ export default function Shop() {
           {cats.map((c) => (
             <button
               key={c.id}
-              onClick={() => setParams({ cat: String(c.id) })}
+              onClick={() => { setPage(1); setParams(cat === c.id ? {} : { cat: String(c.id) }); }}
               className={`rounded-full px-4 py-2 text-xs font-semibold transition-all ${cat === c.id ? 'btn-grad' : 'bg-white text-[#7f4c5a] ring-1 ring-rose-200 hover:bg-rose-50'}`}
             >
               {c.name}
@@ -86,8 +90,19 @@ export default function Shop() {
           ))}
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-3">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="input-soft w-44! py-2!" />
-          <select value={sort} onChange={(e) => setSort(e.target.value as never)} className="input-soft w-44! py-2!">
+          <input
+            value={q}
+            onChange={(e) => { setPage(1); setQ(e.target.value); }}
+            placeholder="Search…"
+            aria-label="Search products"
+            className="input-soft w-44! py-2!"
+          />
+          <select
+            value={sort}
+            onChange={(e) => { setPage(1); setSort(e.target.value as typeof sort); }}
+            aria-label="Sort products"
+            className="input-soft w-44! cursor-pointer py-2!"
+          >
             <option value="newest">Sort: Newest</option>
             <option value="low">Price: Low → High</option>
             <option value="high">Price: High → Low</option>
@@ -114,17 +129,35 @@ export default function Shop() {
 
       {/* pagination */}
       {pages > 1 && (
-        <div className="mt-12 flex justify-center gap-2">
+        <nav className="mt-12 flex flex-wrap items-center justify-center gap-2" aria-label="Pagination">
+          <button
+            onClick={() => { setPage(currentPage - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            disabled={currentPage <= 1}
+            className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#7f4c5a] ring-1 ring-rose-200 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Previous page"
+          >
+            ‹
+          </button>
           {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (
             <button
               key={n}
               onClick={() => { setPage(n); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              className={`grid h-10 w-10 place-items-center rounded-full text-sm font-semibold transition-all ${n === page ? 'btn-grad' : 'bg-white text-[#7f4c5a] ring-1 ring-rose-200 hover:bg-rose-50'}`}
+              aria-label={`Page ${n}`}
+              aria-current={n === currentPage}
+              className={`grid h-10 w-10 place-items-center rounded-full text-sm font-semibold transition-all ${n === currentPage ? 'btn-grad' : 'bg-white text-[#7f4c5a] ring-1 ring-rose-200 hover:bg-rose-50'}`}
             >
               {n}
             </button>
           ))}
-        </div>
+          <button
+            onClick={() => { setPage(currentPage + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            disabled={currentPage >= pages}
+            className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#7f4c5a] ring-1 ring-rose-200 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Next page"
+          >
+            ›
+          </button>
+        </nav>
       )}
     </div>
   );

@@ -73,6 +73,22 @@ export function Scroll3DHero() {
 
   useEffect(() => { BUNDLED.forEach((s) => { const i = new Image(); i.src = s; }); }, []);
 
+  // The ring is meant to spin on its own at all times, so the loop above must
+  // stay alive even when the visitor has stopped scrolling. An
+  // IntersectionObserver lets us keep spinning while the hero is on screen and
+  // freeze it when it isn't — that keeps a 3D transform from burning GPU on a
+  // background animation nobody can see.
+  const [heroVisible, setHeroVisible] = useState(true);
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => setHeroVisible(e.isIntersecting), {
+      threshold: 0.01,
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   // Smoothed scroll progress (no hijacking): the raw scroll position sets a
   // *target*, and an eased value chases it every frame. This makes the ring
   // rotate slowly and buttery-smooth — even when the user flicks the scroll —
@@ -179,7 +195,18 @@ export function Scroll3DHero() {
             className="absolute left-1/2"
             style={{ top: ringTop, width: 0, height: 0, transformStyle: 'preserve-3d', transform: `rotateX(12deg) rotateY(${scrollRot}deg)` }}
           >
-            <div className="av-spin3d absolute" style={{ top: 0, left: 0, width: 0, height: 0 }}>
+            <div
+              className="av-spin3d absolute"
+              style={{
+                top: 0,
+                left: 0,
+                width: 0,
+                height: 0,
+                // Freeze (rather than unmount) while off-screen so the ring
+                // resumes exactly where it left off when scrolled back into view.
+                animationPlayState: heroVisible ? 'running' : 'paused',
+              }}
+            >
               {frames.map((src, i) => (
                 <div
                   key={i}

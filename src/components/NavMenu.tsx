@@ -218,10 +218,14 @@ export function NavMenu() {
   const categories = getCategoriesSorted();
 
   /* ---- the active link detection ---- */
-  const isLinkActive = (to: string, end?: boolean) => {
-    const [path] = to.split('?');
-    if (end) return location.pathname === path;
-    return location.pathname === path;
+  // Compare the query string too, otherwise "Shop" and "Shop All" (which are
+  // the same route with different params) both light up at the same time.
+  const isLinkActive = (to: string) => {
+    const [path, query] = to.split('?');
+    if (location.pathname !== path) return false;
+    if (!query) return true;            // plain link: any query on the same path
+    if (query === 'cat=all') return !location.search; // "Shop All" = no filter
+    return location.search === `?${query}`;
   };
 
   /* ---- resolved items ---- */
@@ -277,7 +281,7 @@ export function NavMenu() {
                   onClick={handleNavClick}
                   className={({ isActive }) =>
                     `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
-                      isActive || isLinkActive(it.to, it.end)
+                      isActive || isLinkActive(it.to)
                         ? 'bg-gradient-to-r from-[#b56576]/10 to-[#d291bc]/10 text-[#b56576] ring-1 ring-rose-200'
                         : 'text-[#5d4954] hover:bg-rose-50/70 hover:text-[#b56576]'
                     }`

@@ -11,6 +11,8 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
+  useRef,
   useState
 } from 'react';
 
@@ -23,10 +25,22 @@ import {
   hashPassword,
   checkPassword,
   sanitize,
+  sellableStock,
   User,
   Product,
   DB_KEY
 } from './db';
+
+import {
+  CartLine,
+  addToLines,
+  countUnits,
+  normalizeCart,
+  removeLine,
+  resolveCart,
+  resolvedTotal,
+  setLineQty,
+} from './cart';
 
 import {
   isCloudConfigured,
@@ -34,9 +48,13 @@ import {
   setSnapshot,
 } from './supabase';
 
-export interface CartItem {
-  product_id: number;
+export interface CartEntry {
+  product: Product;
   quantity: number;
+  /** Units still available for this product (0 once stock runs out). */
+  remaining: number;
+  /** Rounded price × quantity — the figure shown on the drawer/checkout line. */
+  lineTotal: number;
 }
 
 interface Toast {
@@ -58,15 +76,18 @@ interface StoreCtx {
   createInitialAdmin: (u: string, p: string) => { ok: boolean; error?: string };
   logout: () => void;
 
-  cart: CartItem[];
-  addToCart: (id: number, qty?: number) => void;
+  cart: CartLine[];
+  /** Adds to the cart. Returns how many units were actually added (0 = refused). */
+  addToCart: (id: number, qty?: number) => number;
   setQty: (id: number, qty: number) => void;
   removeFromCart: (id: number) => void;
   clearCart: () => void;
 
+  /** Total units in the cart — the number on the navbar badge. */
   cartCount: number;
+  /** Rounded subtotal. Always equals the sum of the per-line totals. */
   cartTotal: number;
-  cartProducts: { product: Product; quantity: number }[];
+  cartProducts: CartEntry[];
 
   cartOpen: boolean;
   setCartOpen: (v: boolean) => void;
@@ -121,9 +142,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const [cart, setCart] = useState<CartItem[]>(() => {
+  const [cart, setCart] = useState<CartLine[]>(() => {
+    // The blob in localStorage is NOT trusted: it can be hand-edited, written by
+    // an older build, or left over from another device. normalizeCart repairs
+    // ids, merges duplicate lines and drops anything unusable, so we never start
+    // a session in a state where the badge and the drawer disagree.
     try {
-      return JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+      return normalizeCart(JSON.parse(localStorage.getItem(CART_KEY) || '[]'));
     } catch {
       return [];
     }
@@ -134,12 +159,92 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [dbVersion, setDbVersion] = useState(0);
   const [ready, setReady] = useState(false);
 
+  /* ---------------- CART ---------------- */
+  /**
+   * The cart is mirrored in a ref and every write goes through `commitCart`.
+   *
+   * Why not `setCart(updater)`? Because two adds in the same tick both read the
+   * same "previous" value, and because a value computed *inside* an updater is
+   * not available until React runs it — which meant `addToCart` could not tell
+   * the caller how many units it really added. Writing the ref synchronously
+   * makes the cart a read-then-write that is always consistent, however many
+   * times it is hit before React re-renders.
+   */
+  const cartRef = useRef<CartLine[]>(cart);
+  cartRef.current = cart;
+
+  const commitCart = useCallback((next: CartLine[]) => {
+    cartRef.current = next;
+    setCart(next);
+  }, []);
+
+  /** Reconcile the stored cart against the live catalog. */
+  const reconcileCart = useCallback((lines: CartLine[]): CartLine[] => {
+    const db = getDB();
+    const next = normalizeCart(lines, (id) => {
+      const p = db.products.find((x) => x.id === id);
+      return p ? { stock: sellableStock(p) } : null;
+    });
+    const unchanged =
+      next.length === lines.length &&
+      next.every((l, i) => l.product_id === lines[i].product_id && l.quantity === lines[i].quantity);
+    return unchanged ? lines : next;
+  }, []);
+
+  /**
+   * Look up the product a cart action refers to, with the stock limit that
+   * action is allowed to work within. Returns null when the product is gone or
+   * not sellable, which is how phantom cart lines get stopped.
+   */
+  const limitsFor = useCallback(
+    (id: number) => {
+      const p = getDB().products.find((x) => x.id === id);
+      return p ? { stock: sellableStock(p) } : null;
+    },
+    []
+  );
+
+  const addToCart = useCallback(
+    (id: number, qty = 1) => {
+      const limit = limitsFor(id);
+      if (!limit || limit.stock <= 0) return 0;
+      const before = cartRef.current.find((l) => l.product_id === id)?.quantity ?? 0;
+      const next = addToLines(cartRef.current, id, qty, limit);
+      const after = next.find((l) => l.product_id === id)?.quantity ?? 0;
+      if (next === cartRef.current) return 0;
+      commitCart(next);
+      return Math.max(0, after - before);
+    },
+    [limitsFor, commitCart]
+  );
+
+  const setQty = useCallback(
+    (id: number, qty: number) => {
+      commitCart(setLineQty(cartRef.current, id, qty, limitsFor(id) || {}));
+    },
+    [limitsFor, commitCart]
+  );
+
+  const removeFromCart = useCallback(
+    (id: number) => commitCart(removeLine(cartRef.current, id)),
+    [commitCart]
+  );
+
+  const clearCart = useCallback(() => commitCart([]), [commitCart]);
+
   /* ---------------- DB change listener ---------------- */
   useEffect(() => {
-    const fn = () => setDbVersion((v) => v + 1);
+    const fn = () => {
+      setDbVersion((v) => v + 1);
+      // A product can be deleted, hidden, or have its stock reduced at any time
+      // (admin edit, cloud sync from another device). Re-reconcile the cart so
+      // the badge, the drawer and the total never reference a product that is
+      // no longer purchasable.
+      if (cartRef.current.length > 0) commitCart(reconcileCart(cartRef.current));
+    };
     window.addEventListener('avyukta-db-change', fn);
     return () => window.removeEventListener('avyukta-db-change', fn);
-  }, []);
+  }, [commitCart, reconcileCart]);
 
   /* ---------------- CLOUD INIT (pull-only, never auto-seed) ---------------- */
   useEffect(() => {
@@ -165,6 +270,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
     })();
   }, []);
+
+  /* ---------------- first reconciliation against the real catalog ----------
+   * The cart is read from localStorage before the catalog is known, so lines
+   * for products that no longer exist (or are no longer sellable) are still in
+   * state at this point. Purge them once we have the catalog so storage stays
+   * clean and a later price/stock change can never resurrect them. */
+  useEffect(() => {
+    if (!ready) return;
+    if (cartRef.current.length > 0) commitCart(reconcileCart(cartRef.current));
+  }, [ready, commitCart, reconcileCart]);
 
   /* ---------------- multi-tab sync ---------------- */
   useEffect(() => {
@@ -253,46 +368,32 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => setSession(null), []);
 
-  /* ---------------- CART ---------------- */
-  const addToCart = useCallback((id: number, qty = 1) => {
-    setCart((c) => {
-      const ex = c.find((i) => i.product_id === id);
-      if (ex)
-        return c.map((i) => (i.product_id === id ? { ...i, quantity: i.quantity + qty } : i));
-      return [...c, { product_id: id, quantity: qty }];
-    });
-  }, []);
 
-  const setQty = useCallback((id: number, qty: number) => {
-    setCart((c) =>
-      qty <= 0
-        ? c.filter((i) => i.product_id !== id)
-        : c.map((i) => (i.product_id === id ? { ...i, quantity: qty } : i))
-    );
-  }, []);
-
-  const removeFromCart = useCallback(
-    (id: number) => setCart((c) => c.filter((i) => i.product_id !== id)),
-    []
-  );
-
-  const clearCart = useCallback(() => setCart([]), []);
 
   /* ---------------- derived ---------------- */
   const db = ready ? getDB() : null;
 
-  const cartProducts =
-    db
-      ? cart
-          .map((i) => ({
-            product: db.products.find((p) => p.id === i.product_id)!,
-            quantity: i.quantity,
-          }))
-          .filter((x) => x.product)
-      : [];
+  // Resolve the cart against the live catalog ONCE, then derive the badge count,
+  // the drawer rows and the total from that same list. This is the fix for "the
+  // badge says 2 but the drawer only has 1 / the total is for 1": previously the
+  // badge summed the raw cart while the drawer and the total silently dropped
+  // lines whose product could not be resolved.
+  const cartProducts = useMemo<CartEntry[]>(() => {
+    if (!db) return [];
+    return resolveCart(
+      cart,
+      db.products.map((p) => ({ ref: p, id: p.id, price: p.price, available: sellableStock(p) }))
+    ).map((line) => ({
+      product: line.product.ref,
+      quantity: line.quantity,
+      remaining: line.remaining,
+      lineTotal: line.lineTotal,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart, db, dbVersion]);
 
-  const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
-  const cartTotal = cartProducts.reduce((s, i) => s + i.product.price * i.quantity, 0);
+  const cartCount = countUnits(cartProducts);
+  const cartTotal = resolvedTotal(cartProducts);
 
   if (!ready) {
     return (
