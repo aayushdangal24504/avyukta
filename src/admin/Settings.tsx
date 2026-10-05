@@ -475,7 +475,7 @@ export default function AdminSettings() {
             {field('testimonials_kicker', 'Small label')}
             {field('testimonials_title', 'Title')}
           </div>
-          {area('testimonials', 'Reviews', 5, 'One per line, format: Name | review text.')}
+          {area('testimonials', 'Reviews', 5, 'Only add verified customer feedback. One per line: Customer name | rating from 1 to 5 | review text.')}
         </div>
 
         {/* footer */}

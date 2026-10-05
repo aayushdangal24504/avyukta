@@ -6,6 +6,7 @@ import { useStore, flyToCart } from '../lib/store';
 import { EmptyState, Reveal, SafeImage } from '../components/ui';
 import { ProductCard } from '../components/ProductCard';
 import { trackProductView, trackAddToCart, trackBuyNow } from '../lib/analytics';
+import { ReviewWidget } from '../components/ReviewWidget';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -175,6 +176,8 @@ export default function ProductDetail() {
           <button onClick={() => setCartOpen(true)} className="mt-4 text-xs text-[#a98993] underline-offset-2 hover:underline">View cart →</button>
         </div>
       </div>
+
+      <ReviewWidget productId={product.id} productName={product.name} />
 
       {/* related */}
       {related.length > 0 && (

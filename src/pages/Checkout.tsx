@@ -25,6 +25,7 @@ import { useStore } from '../lib/store';
 import { sendOrderEmails } from '../lib/email';
 import { EmptyState, SafeImage, Spinner } from '../components/ui';
 import { RichText } from '../components/RichText';
+import { ReviewWidget } from '../components/ReviewWidget';
 import { trackCheckout, trackOrder } from '../lib/analytics';
 
 const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
@@ -898,6 +899,8 @@ function SuccessPage({
             </div>
           </details>
         )}
+
+        <ReviewWidget />
 
         {/* CTAs */}
         <div className="anim-up mt-5 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
