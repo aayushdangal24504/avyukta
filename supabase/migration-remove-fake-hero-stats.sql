@@ -1,0 +1,29 @@
+-- ============================================================
+--  Remove the hand-typed hero stats (superseded by real ones)
+-- ============================================================
+--
+--  The homepage hero used to render the free-text `hero_stats` setting, which
+--  shipped with invented figures:
+--
+--      100% | Handmade
+--      1.2k+ | Happy gifts
+--      ★ 4.9 | Avg. rating
+--
+--  Those numbers were not backed by any row. The hero now CALCULATES its stats
+--  from real data (src/lib/heroStats.ts):
+--
+--      Handmade designs → visible products in the catalogue
+--      Gifts delivered  → units on orders whose status is Delivered
+--      Avg. rating      → mean of the explicit 1–5 ratings left in reviews
+--
+--  and a stat is shown only when there is real data behind it.
+--
+--  The application no longer reads this setting, so deleting the row is safe
+--  (and simply removes the stale fake figures from the database). It does NOT
+--  touch products, categories, orders, order items, users or any other
+--  setting.
+--
+--  Run once in the Supabase SQL Editor.
+-- ============================================================
+
+delete from settings where key = 'hero_stats';
