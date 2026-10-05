@@ -6,13 +6,14 @@ import { useStore } from '../lib/store';
 import { Spinner, SafeImage } from '../components/ui';
 import CloudSync from './CloudSync';
 import { fileToCompressedDataURL, uploadProductImage } from '../lib/storage';
+import { computeHeroStats } from '../lib/heroStats';
 
 /** All editable TEXT keys, grouped for the form. */
 const CONTENT_KEYS = [
   'store_name', 'tagline',
   'phone', 'email', 'address', 'website', 'business_hours',
   'instagram', 'tiktok', 'whatsapp',
-  'hero_title', 'hero_subtitle', 'hero_cta', 'hero_cta2', 'hero_stats',
+  'hero_title', 'hero_subtitle', 'hero_cta', 'hero_cta2',
   'categories_kicker', 'categories_title',
   'featured_kicker', 'featured_title', 'new_title', 'best_title',
   'about_kicker', 'about_title', 'about_text', 'about_points',
@@ -49,6 +50,9 @@ export default function AdminSettings() {
   const [busyInfo, setBusyInfo] = useState(false);
   const [busyPw, setBusyPw] = useState(false);
   const [uploading, setUploading] = useState<ImageKey | ''>('');
+
+  /** Live preview of the hero stats the storefront will show (calculated). */
+  const heroStats = computeHeroStats(db);
 
   /* ---- 3D ring photo picker (top-of-homepage rotating ring) ---- */
   const [ringIds, setRingIds] = useState<number[]>(() =>
@@ -312,7 +316,27 @@ export default function AdminSettings() {
               {field('hero_cta', 'Main button text', 'Goes to the Shop page.')}
               {field('hero_cta2', 'Second button text', 'Scrolls to the categories section.')}
             </div>
-            {area('hero_stats', 'Hero stats', 3, 'One per line, format: value | label  (e.g. "100% | Handmade")')}
+            {/* Hero stats are COUNTED, never typed — see src/lib/heroStats.ts. */}
+            <div className="rounded-2xl bg-rose-50/60 p-4 ring-1 ring-rose-100">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#7f4c5a]">Hero stats (calculated)</p>
+              {heroStats.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-6">
+                  {heroStats.map((s) => (
+                    <div key={s.label}>
+                      <p className="font-display text-xl font-bold text-[#7f4c5a]">{s.value}</p>
+                      <p className="text-[11px] uppercase tracking-wider text-[#a98993]">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-[11px] text-[#bba3ab]">
+                  Nothing to show yet — a stat appears once the store has a visible product, a delivered order or a rated review.
+                </p>
+              )}
+              <p className="mt-2 text-[11px] text-[#bba3ab]">
+                Counted from your live data: visible products, delivered orders and the ratings your customers left. There is no field to type them, so the storefront can never display a number that isn&apos;t real.
+              </p>
+            </div>
           </div>
 
           <ImagePicker

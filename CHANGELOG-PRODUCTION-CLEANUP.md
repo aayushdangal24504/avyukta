@@ -159,3 +159,36 @@ This is a complete audit of every change made to make the codebase
 
 - ✅ `npx tsc --noEmit` — passes cleanly
 - ✅ `npm run build` — passes cleanly (vite singlefile output ~628 KB)
+
+---
+
+## Hero stats: typed figures → calculated figures
+
+The hero used to render the free-text `hero_stats` setting, whose shipped value
+was three invented numbers — `100% | Handmade`, `1.2k+ | Happy gifts`,
+`★ 4.9 | Avg. rating`. Nothing backed them, and the field let anyone type new
+ones straight onto the storefront.
+
+### `src/lib/heroStats.ts` (new)
+- `computeHeroStats(db)` returns the hero stats, **counted from real rows**:
+  - `Handmade designs` — products with `is_visible = true` (the set the shop shows).
+  - `Gifts delivered` — units on `order_items` whose order status is `Delivered…`.
+  - `Avg. rating` — mean of the explicit 1–5 ratings in `testimonials` (`Name | rating | text`).
+- A stat is returned **only when real data backs it**. An empty store shows no
+  stats, a store with nothing delivered shows no delivery count, and the rating
+  appears with the first rated review. Unrated (legacy) reviews are ignored, so
+  they can neither raise nor lower the average. Counts are exact — never `1.2k+`.
+- Pure module (type-only imports), unit-tested in `src/lib/heroStats.test.ts`.
+
+### `src/pages/Home.tsx`
+- **Removed** `parseStats()` and the `hero_stats` setting read; the hero now
+  renders `computeHeroStats(getDB())`.
+- Stats still hide themselves when there is nothing to show.
+
+### `src/admin/Settings.tsx`
+- **Removed** the `Hero stats` text box — stats can no longer be typed in.
+- Replaced with a live **calculated preview** of exactly what the storefront shows.
+
+### `supabase/migration-remove-fake-hero-stats.sql` (new)
+- One-line, optional cleanup that deletes the stale `hero_stats` row (the app no
+  longer reads it). Touches nothing else.

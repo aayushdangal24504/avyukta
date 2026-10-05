@@ -3,7 +3,8 @@
  *  No hardcoded titles, copy, testimonials, stats, or images. */
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getCategoriesSorted, getSetting, getVisibleProducts } from '../lib/db';
+import { getCategoriesSorted, getDB, getSetting, getVisibleProducts } from '../lib/db';
+import { computeHeroStats } from '../lib/heroStats';
 import { useStore } from '../lib/store';
 import { EmptyState, Reveal, SkeletonCard, Tilt, SafeImage } from '../components/ui';
 import { RichText } from '../components/RichText';
@@ -30,17 +31,6 @@ function parseTestimonials(): { name: string; rating: number; text: string }[] {
       return null;
     })
     .filter((review): review is { name: string; rating: number; text: string } => review !== null);
-}
-
-function parseStats(): { n: string; l: string }[] {
-  return getSetting('hero_stats')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((l) => {
-      const i = l.indexOf('|');
-      return i === -1 ? { n: l, l: '' } : { n: l.slice(0, i).trim(), l: l.slice(i + 1).trim() };
-    });
 }
 
 export default function Home() {
@@ -89,7 +79,9 @@ export default function Home() {
   const heroSubtitle = getSetting('hero_subtitle');
   const heroCta = getSetting('hero_cta');
   const heroCta2 = getSetting('hero_cta2');
-  const stats = parseStats();
+  // Real numbers only: counted from the catalogue, delivered orders and rated
+  // reviews actually in the database. Never the old hand-typed `hero_stats`.
+  const stats = computeHeroStats(getDB());
 
   const categoriesKicker = getSetting('categories_kicker');
   const categoriesTitle = getSetting('categories_title');
@@ -187,9 +179,9 @@ export default function Home() {
               {stats.length > 0 && (
                 <div className="anim-up mt-10 flex flex-wrap gap-8" style={{ animationDelay: '.6s' }}>
                   {stats.map((s) => (
-                    <div key={s.l + s.n}>
-                      <p className="font-display text-2xl font-bold text-[#7f4c5a]">{s.n}</p>
-                      <p className="text-xs uppercase tracking-wider text-[#a98993]">{s.l}</p>
+                    <div key={s.label + s.value}>
+                      <p className="font-display text-2xl font-bold text-[#7f4c5a]">{s.value}</p>
+                      <p className="text-xs uppercase tracking-wider text-[#a98993]">{s.label}</p>
                     </div>
                   ))}
                 </div>
