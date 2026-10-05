@@ -91,6 +91,8 @@ function getVisitorId(): string {
 
 let localEvents: AnalyticsEvent[] = [];
 let nextId = 1;
+/** Index of the first event not yet confirmed written to Supabase. */
+let syncedUpTo = 0;
 
 function loadLocal(): AnalyticsEvent[] {
   if (localEvents.length > 0) return localEvents;
@@ -100,6 +102,8 @@ function loadLocal(): AnalyticsEvent[] {
       localEvents = JSON.parse(raw) as AnalyticsEvent[];
       const maxId = localEvents.reduce((m, e) => Math.max(m, e.id), 0);
       nextId = maxId + 1;
+      // Nothing is known to be in the cloud yet, so replay the whole queue.
+      syncedUpTo = 0;
     }
   } catch { /* corrupted */ }
   return localEvents;
@@ -109,7 +113,10 @@ function saveLocal() {
   try {
     // Cap to prevent localStorage bloat
     if (localEvents.length > MAX_LOCAL_EVENTS) {
+      const dropped = localEvents.length - MAX_LOCAL_EVENTS;
       localEvents = localEvents.slice(-MAX_LOCAL_EVENTS);
+      // Keep the cursor pointing at the same event after the shift.
+      syncedUpTo = Math.max(0, Math.min(syncedUpTo - dropped, localEvents.length));
     }
     localStorage.setItem(ANALYTICS_KEY, JSON.stringify(localEvents));
   } catch { /* quota exceeded */ }
@@ -267,15 +274,17 @@ async function flushToCloud() {
   if (!sb) return;
 
   loadLocal();
-  if (localEvents.length === 0) return;
+  if (localEvents.length <= syncedUpTo) return;
 
   syncing = true;
   try {
-    // Get already-synced count from last flush
-    const unsent = localEvents;
-    if (unsent.length === 0) { syncing = false; return; }
+    // Only the events after the last confirmed-successful insert. Previously the
+    // whole queue was re-sent every cycle AND cleared even after a failure, so
+    // a partial failure either duplicated rows in Supabase or silently threw
+    // the batch away.
+    const unsent = localEvents.slice(syncedUpTo);
+    let sent = syncedUpTo;
 
-    // Batch insert
     for (let i = 0; i < unsent.length; i += BATCH_SIZE) {
       const batch = unsent.slice(i, i + BATCH_SIZE).map((ev) => ({
         event_type: ev.event_type,
@@ -293,12 +302,16 @@ async function flushToCloud() {
       const { error } = await sb.from('analytics_events').insert(batch);
       if (error) {
         console.warn('Analytics flush error:', error.message);
-        break; // stop on first error; retry next cycle
+        break; // keep the remainder queued for the next cycle
       }
+      sent += Math.min(BATCH_SIZE, unsent.length - i);
     }
 
-    // On success: clear local store (events are now in Supabase)
-    localEvents = [];
+    syncedUpTo = sent;
+    if (sent >= localEvents.length) {
+      localEvents = [];
+      syncedUpTo = 0;
+    }
     saveLocal();
   } catch (e) {
     console.warn('Analytics flush failed:', (e as Error).message);

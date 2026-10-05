@@ -11,16 +11,25 @@ import { ProductShowcase3D } from '../components/ProductShowcase3D';
 import { Scroll3DHero } from '../components/Scroll3DHero';
 import { ProductCard } from '../components/ProductCard';
 import { trackCTA } from '../lib/analytics';
+import { ReviewWidget } from '../components/ReviewWidget';
 
-function parseTestimonials(): { name: string; text: string }[] {
+function parseTestimonials(): { name: string; rating: number; text: string }[] {
   return getSetting('testimonials')
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)
     .map((l) => {
-      const i = l.indexOf('|');
-      return i === -1 ? { name: '', text: l } : { name: l.slice(0, i).trim(), text: l.slice(i + 1).trim() };
-    });
+      // Review format: Customer name | 1-5 rating | review text
+      const parts = l.split('|').map((part) => part.trim());
+      if (parts.length >= 3) {
+        const rating = Math.min(5, Math.max(1, Number(parts[1]) || 5));
+        return { name: parts[0], rating, text: parts.slice(2).join(' | ') };
+      }
+      // Old testimonial entries are intentionally hidden until they are replaced
+      // with a verified, explicitly-rated customer review.
+      return null;
+    })
+    .filter((review): review is { name: string; rating: number; text: string } => review !== null);
 }
 
 function parseStats(): { n: string; l: string }[] {
@@ -344,6 +353,8 @@ export default function Home() {
         </section>
       )}
 
+      <ReviewWidget />
+
       {/* ============================= TESTIMONIALS ============================= */}
       {testimonials.length > 0 && (
         <section className="mx-auto max-w-4xl px-6 py-16 text-center">
@@ -357,7 +368,9 @@ export default function Home() {
                 {testimonials.map((t, i) => (
                   <figure key={i} className="w-full shrink-0 px-2">
                     <div className="mx-auto max-w-2xl rounded-3xl bg-white p-8 shadow-lg shadow-rose-100/70 ring-1 ring-rose-50">
-                      <p className="text-lg text-[#d291bc]">★★★★★</p>
+                      <div className="flex items-center justify-center gap-1 text-lg text-[#d291bc]" aria-label={`${t.rating} out of 5 stars`}>
+                        {[1, 2, 3, 4, 5].map((star) => <span key={star} className={star <= t.rating ? '' : 'text-rose-100'}>★</span>)}
+                      </div>
                       <blockquote className="mt-3 font-display text-lg italic leading-relaxed text-[#5d4954]">“{t.text}”</blockquote>
                       {t.name && <figcaption className="mt-4 text-sm font-semibold text-[#b56576]">— {t.name}</figcaption>}
                     </div>

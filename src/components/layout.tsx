@@ -132,11 +132,21 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', fn);
   }, []);
   useEffect(() => {
-    const fn = (e: MouseEvent) => {
+    const onDown = (e: MouseEvent) => {
       if (boxRef.current && !boxRef.current.contains(e.target as Node)) setShowResults(false);
     };
-    document.addEventListener('mousedown', fn);
-    return () => document.removeEventListener('mousedown', fn);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowResults(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
   }, []);
 
   const results = query.trim()
@@ -183,6 +193,7 @@ export function Navbar() {
                 {results.map((p) => (
                   <button
                     key={p.id}
+                    type="button"
                     onClick={() => { setShowResults(false); setQuery(''); nav(`/product/${p.id}`); }}
                     className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-[#fff3ef]"
                   >
@@ -225,21 +236,44 @@ export function Navbar() {
 
 /* ------------------------------ Cart drawer ------------------------------ */
 export function CartDrawer() {
-  const { cartOpen, setCartOpen, cartProducts, setQty, removeFromCart, cartTotal } = useStore();
+  const { cartOpen, setCartOpen, cartProducts, setQty, removeFromCart, cartTotal, cartCount } = useStore();
   const nav = useNavigate();
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  // Escape closes, and the page behind must not scroll while it's open.
+  useEffect(() => {
+    if (!cartOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCartOpen(false); };
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeRef.current?.focus();
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [cartOpen, setCartOpen]);
+
   return (
     <>
       <div
         className={`fixed inset-0 z-[90] bg-[#41323a]/40 backdrop-blur-sm transition-opacity duration-300 ${cartOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         onClick={() => setCartOpen(false)}
+        aria-hidden="true"
       />
       <aside
-        className={`fixed right-0 top-0 z-[95] flex h-full w-full max-w-md flex-col bg-[#fffaf0] shadow-2xl transition-transform duration-500 ${cartOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Shopping cart"
+        className={`fixed right-0 top-0 z-[95] flex h-full w-full max-w-md flex-col bg-[#fffaf0] shadow-2xl transition-transform duration-500 ${cartOpen ? 'translate-x-0' : 'pointer-events-none translate-x-full'}`}
         style={{ transitionTimingFunction: 'cubic-bezier(.22,1,.36,1)' }}
       >
         <div className="flex items-center justify-between border-b border-rose-100 px-6 py-4">
-          <h2 className="font-display text-lg font-bold text-[#7f4c5a]">Your Cart 🌸</h2>
-          <button onClick={() => setCartOpen(false)} className="grid h-9 w-9 place-items-center rounded-full bg-white shadow ring-1 ring-rose-100 transition hover:rotate-90">✕</button>
+          <h2 className="font-display text-lg font-bold text-[#7f4c5a]">
+            Your Cart 🌸
+            {cartCount > 0 && <span className="ml-2 text-sm font-medium text-[#a98993]">{cartCount} item{cartCount === 1 ? '' : 's'}</span>}
+          </h2>
+          <button ref={closeRef} onClick={() => setCartOpen(false)} aria-label="Close cart" className="grid h-9 w-9 place-items-center rounded-full bg-white shadow ring-1 ring-rose-100 transition hover:rotate-90">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -253,31 +287,46 @@ export function CartDrawer() {
             </div>
           ) : (
             <ul className="space-y-4">
-              {cartProducts.map(({ product, quantity }) => (
+              {cartProducts.map(({ product, quantity, remaining, lineTotal }) => {
+                return (
                 <li key={product.id} className="anim-fade flex gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-rose-50">
-                  <SafeImage src={product.images?.[0]} alt={product.name} className="h-20 w-20 rounded-xl" imgClassName="object-cover" />
-                  <div className="flex flex-1 flex-col">
-                    <p className="text-sm font-semibold text-[#5d4954]">{product.name}</p>
-                    <p className="text-xs font-medium text-[#b56576]">{money(product.price)}</p>
-                    <div className="mt-auto flex items-center gap-2">
-                      <button onClick={() => setQty(product.id, quantity - 1)} className="grid h-7 w-7 place-items-center rounded-full bg-[#fcd5ce]/60 text-sm font-bold text-[#7f4c5a] transition active:scale-90">−</button>
-                      <span className="w-6 text-center text-sm font-semibold">{quantity}</span>
-                      <button onClick={() => setQty(product.id, Math.min(quantity + 1, product.stock || 99))} className="grid h-7 w-7 place-items-center rounded-full bg-[#fcd5ce]/60 text-sm font-bold text-[#7f4c5a] transition active:scale-90">+</button>
+                  <SafeImage src={product.images?.[0]} alt={product.name} className="h-20 w-20 shrink-0 rounded-xl" imgClassName="object-cover" />
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <p className="truncate text-sm font-semibold text-[#5d4954]">{product.name}</p>
+                    <p className="mt-0.5 text-xs font-medium text-[#a98993]">{money(product.price)} each</p>
+                    <div className="mt-auto flex items-center gap-2 pt-2">
+                      <button
+                        onClick={() => setQty(product.id, quantity - 1)}
+                        aria-label={`Decrease quantity of ${product.name}`}
+                        className="grid h-7 w-7 place-items-center rounded-full bg-[#fcd5ce]/60 text-sm font-bold text-[#7f4c5a] transition hover:bg-[#f8b4c0] active:scale-90"
+                      >−</button>
+                      <span className="w-7 text-center text-sm font-semibold tabular-nums" aria-live="polite">{quantity}</span>
+                      <button
+                        onClick={() => setQty(product.id, quantity + 1)}
+                        disabled={remaining <= 0}
+                        aria-label={`Increase quantity of ${product.name}`}
+                        title={remaining <= 0 ? `Only ${quantity} left in stock` : undefined}
+                        className="grid h-7 w-7 place-items-center rounded-full bg-[#fcd5ce]/60 text-sm font-bold text-[#7f4c5a] transition hover:bg-[#f8b4c0] active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
+                      >+</button>
+                      <span className="ml-1 font-display text-sm font-bold text-[#b56576]">{money(lineTotal)}</span>
                       <button onClick={() => removeFromCart(product.id)} className="ml-auto text-xs text-rose-300 transition hover:text-red-500">Remove</button>
                     </div>
+                    {remaining <= 2 && <p className="mt-1 text-[10px] font-semibold text-amber-600">Only {remaining} left in stock</p>}
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </div>
 
         {cartProducts.length > 0 && (
           <div className="border-t border-rose-100 px-6 py-5">
-            <div className="mb-4 flex items-center justify-between">
-              <span className="text-sm text-[#a98993]">Subtotal</span>
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-sm text-[#a98993]">Subtotal ({cartCount} item{cartCount === 1 ? '' : 's'})</span>
               <span className="font-display text-xl font-bold text-[#7f4c5a]">{money(cartTotal)}</span>
             </div>
+            <p className="mb-4 text-[11px] text-[#bba3ab]">Delivery is free · payment arranged after confirmation</p>
             <button onClick={() => { setCartOpen(false); nav('/checkout'); }} className="btn-grad w-full rounded-full py-3 text-sm font-semibold tracking-wide">
               Checkout
             </button>

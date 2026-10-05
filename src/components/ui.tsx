@@ -1,6 +1,7 @@
 /** Shared UI primitives: Reveal, Petals, Toasts, Skeleton, counters, NoImage. */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../lib/store';
+import { statusStyle } from '../lib/db';
 
 /* ------------- IntersectionObserver scroll-triggered reveal ------------- */
 export function Reveal({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
@@ -8,17 +9,21 @@ export function Reveal({ children, delay = 0, className = '' }: { children: Reac
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const obs = new IntersectionObserver(
       ([e]) => {
         if (e.isIntersecting) {
-          setTimeout(() => el.classList.add('in'), delay);
+          timer = setTimeout(() => el.classList.add('in'), delay);
           obs.disconnect();
         }
       },
       { threshold: 0.12 }
     );
     obs.observe(el);
-    return () => obs.disconnect();
+    return () => {
+      obs.disconnect();
+      if (timer) clearTimeout(timer);
+    };
   }, [delay]);
   return (
     <div ref={ref} className={`reveal ${className}`}>
@@ -29,19 +34,26 @@ export function Reveal({ children, delay = 0, className = '' }: { children: Reac
 
 /* --------------------- floating flower petals background ------------------ */
 export function Petals({ count = 14 }: { count?: number }) {
-  const petals = Array.from({ length: count }, (_, i) => {
-    const size = 10 + Math.random() * 16;
-    return {
-      id: i,
-      left: Math.random() * 100,
-      size,
-      fall: 9 + Math.random() * 14,
-      sway: 2.4 + Math.random() * 2.5,
-      delay: -Math.random() * 20,
-      hue: ['#fcd5ce', '#f6bdc8', '#e8a2b8', '#fde2d4'][i % 4],
-      rot: Math.random() * 360,
-    };
-  });
+  // Generated ONCE. Re-rolling these on every render made all the petals jump
+  // to new positions whenever anything in the app re-rendered (adding to the
+  // cart, opening the drawer, a cloud refresh…).
+  const petals = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => {
+        const size = 10 + Math.random() * 16;
+        return {
+          id: i,
+          left: Math.random() * 100,
+          size,
+          fall: 9 + Math.random() * 14,
+          sway: 2.4 + Math.random() * 2.5,
+          delay: -Math.random() * 20,
+          hue: ['#fcd5ce', '#f6bdc8', '#e8a2b8', '#fde2d4'][i % 4],
+          rot: Math.random() * 360,
+        };
+      }),
+    [count]
+  );
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-[5] overflow-hidden">
       {petals.map((p) => (
@@ -163,14 +175,11 @@ export function EmptyState({ icon, title, sub, action }: { icon: string; title: 
 
 /* ----------------------------- status badge ----------------------------- */
 export function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    Pending: 'bg-amber-100 text-amber-700 ring-amber-300',
-    Confirmed: 'bg-blue-100 text-blue-700 ring-blue-300',
-    Shipped: 'bg-purple-100 text-purple-700 ring-purple-300',
-    Delivered: 'bg-emerald-100 text-emerald-700 ring-emerald-300',
-    Cancelled: 'bg-red-100 text-red-700 ring-red-300',
-  };
-  return <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${map[status] || map.Pending}`}>{status}</span>;
+  return (
+    <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusStyle(status)}`}>
+      {status}
+    </span>
+  );
 }
 
 /* spinner for loading buttons */
